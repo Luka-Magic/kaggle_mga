@@ -65,7 +65,7 @@ def split_data(cfg, lmdb_dir):
                 label_key = f'label-{str(idx).zfill(8)}'.encode()
                 label = txn.get(label_key).decode('utf-8')
             json_dict = json.loads(label)
-            label = cfg.chart_type2label(json_dict['chart-type'])
+            label = cfg.chart_type2label[json_dict['chart-type']]
             labels.append(label)
         for fold, (train_fold_indices, vaild_fold_indices) \
                 in enumerate(StratifiedKFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(indices, labels)):
@@ -113,7 +113,7 @@ class MgaLmdbDataset(Dataset):
 
         # label
         json_dict = json.loads(label)
-        label = self.chart_type2label(json_dict['chart-type'])
+        label = self.chart_type2label[json_dict['chart-type']]
 
         return img, label
 
