@@ -314,7 +314,7 @@ def main():
             NotImplementedError
         
         # grad scaler
-        scaler = GradScaler()
+        scaler = GradScaler(enabled=cfg.use_amp)
 
         for epoch in range(1, cfg.epoch + 1):
             train_loss, train_accuracy, lr = train_one_epoch(cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
