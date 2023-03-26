@@ -74,7 +74,7 @@ def split_data(cfg, lmdb_dir):
                 'train': train_fold_indices,
                 'valid': vaild_fold_indices
             }
-
+    print(len(indices_dict[0]['train']), len(indices_dict[0]['valid']))
     return indices_dict
 
 # Lmdb Dataset
@@ -212,7 +212,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         
         if scheduler_step_time == 'step':
             scheduler.step()
-        pbar.set_description(f'[Epoch {epoch}/{cfg.n_epochs}]')
+        pbar.set_description(f'[Train epoch {epoch}/{cfg.n_epochs}]')
         pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
     if scheduler_step_time == 'epoch':
         scheduler.step()
@@ -244,7 +244,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
         accuracy.update(batch_accuracy, bs)
         losses.update(loss.item(), bs)
         
-        pbar.set_description(f'[Epoch {epoch}/{cfg.n_epochs}]')
+        pbar.set_description(f'[Valid epoch {epoch}/{cfg.n_epochs}]')
         pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
     
     return losses.avg, accuracy.avg
@@ -318,7 +318,7 @@ def main():
 
         for epoch in range(1, cfg.n_epochs + 1):
             train_loss, train_accuracy, lr = train_one_epoch(cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
-            valid_loss, valid_accuracy =  valid_one_epoch(cfg, epoch, train_loader, model, loss_fn, device)
+            valid_loss, valid_accuracy =  valid_one_epoch(cfg, epoch, valid_loader, model, loss_fn, device)
             print('-'*80)
             print(f'Epoch {epoch}/{cfg.n_epochs}')
             print(f'    Train Loss: {train_loss:.5f}, Train acc: {train_accuracy*100:.3f}%, lr: {lr:.7f}')
