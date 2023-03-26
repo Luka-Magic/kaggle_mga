@@ -13,8 +13,8 @@ from_lmdb: true
 ######   Model   #######################################
 model_arch: centernet
 pretrained: true
-input_size: 3
-output_size: 5
+input_channel: 3
+output_channel: 1
 
 ######   Loss   ########################################
 loss: CrossEntropyLoss # MSELoss, BCEWithLogitsLoss, RMSELoss, FOCALLoss
@@ -22,7 +22,7 @@ gamma: 0. # FOCALLoss
 
 ##### Optimizer ########################################
 optimizer: AdamW
-lr: 1e-4
+lr: 1e-3
 weight_decay: 1e-6
 
 ##### Scheduler ########################################

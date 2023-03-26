@@ -112,7 +112,7 @@ class MgaLmdbDataset(Dataset):
 
         # label
         json_dict = json.loads(label)
-        label = self.chart_type2label[json_dict['chart-type']]
+        label = json_dict['key_point']
 
         return img, label
 
@@ -273,8 +273,8 @@ def main():
         }
 
         # model
-        if cfg.model_arch == 'keypointrcnn_resnet50_fpn':
-            model = torchvision.models.detection.keypointrcnn_resnet50_fpn()
+        if cfg.model_arch == 'centernet':
+            model = CenterNet(n_classes=cfg.output_channel, pretrained=cfg.pretrained)
 
         # loss
         if cfg.loss_fn == 'CrossEntropyLoss':

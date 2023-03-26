@@ -45,10 +45,11 @@ class up(nn.Module):
         return x
 
 class CenterNet(nn.Module):
-    def __init__(self, n_classes=1, model_name="resnet18"):
+    def __init__(self, n_classes=1, pretrained=True):
         super().__init__()
         # create backbone.
-        basemodel = torchvision.models.resnet18(pretrained=True) # turn this on for training
+        model_name = "resnet18"
+        basemodel = torchvision.models.resnet18(pretrained=pretrained) # turn this on for training
         basemodel = nn.Sequential(*list(basemodel.children())[:-2])
         # set basemodel
         self.base_model = basemodel

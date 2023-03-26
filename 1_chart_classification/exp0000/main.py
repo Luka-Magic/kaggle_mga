@@ -332,16 +332,16 @@ def main():
             'valid_accuracy': valid_accuracy,
             'model': model.state_dict()
         }
-        if valid_loss < best_loss:
-            best_loss = valid_loss
+        if valid_loss < best_score['loss']:
+            best_score['loss'] = valid_loss
             torch.save(save_dict, str(SAVE_DIR / 'best_loss.pth'))
             if cfg.use_wandb:
-                wandb.run.summary['best_loss'] = best_loss
-        if valid_accuracy > best_accuracy:
-            best_accuracy = valid_accuracy
+                wandb.run.summary['best_loss'] = best_score['loss']
+        if valid_accuracy > best_score['accuracy']:
+            best_score['accuracy'] = valid_accuracy
             torch.save(save_dict, str(SAVE_DIR / 'best_accuracy.pth'))
             if cfg.use_wandb:
-                wandb.run.summary['best_accuracy'] = best_accuracy
+                wandb.run.summary['best_accuracy'] = best_score['accuracy']
         del save_dict
         gc.collect()
 
@@ -356,7 +356,7 @@ def main():
                 'valid_accuracy': valid_accuracy
             })
     wandb.finish()
-    del model, train_loader, valid_loader, loss_fn, optimizer, scheduler, best_loss, best_accuracy
+    del model, train_loader, valid_loader, loss_fn, optimizer, scheduler, best_score
 
 
         
