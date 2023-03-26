@@ -45,7 +45,7 @@ from utils import seed_everything, AverageMeter
 def split_data(cfg, lmdb_dir):
     indices_dict = {}
 
-    env = lmdb.open(lmdb_dir, max_readers=32, readonly=True, lock=False, readahead=False, meminit=False)
+    env = lmdb.open(str(lmdb_dir), max_readers=32, readonly=True, lock=False, readahead=False, meminit=False)
     with env.begin(write=False) as txn:
         n_samples = int(txn.get('num-samples'.encode()))
     
@@ -79,7 +79,7 @@ class MgaLmdbDataset(Dataset):
         self.cfg = cfg
         self.transforms = transforms
         self.indices = indices
-        self.env = lmdb.open(lmdb_dir, max_readers=32, readonly=True, lock=False, readahead=False, meminit=False)
+        self.env = lmdb.open(str(lmdb_dir), max_readers=32, readonly=True, lock=False, readahead=False, meminit=False)
         self.chart_type2label = cfg.chart_type2label
 
     def __len__(self):
