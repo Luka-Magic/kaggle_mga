@@ -19,7 +19,7 @@ chart_type2label:
   horizontal_bar: 4
 
 ######   Model   #######################################
-model_arch: swin_large_patch4_window7_384
+model_arch: swin_base_patch4_window12_384_in22k
 pretrained: true
 input_size: 3
 output_size: 5
