@@ -25,7 +25,7 @@ input_size: 3
 output_size: 5
 
 ######   Loss   ########################################
-loss: CrossEntropyLoss # MSELoss, BCEWithLogitsLoss, RMSELoss, FOCALLoss
+loss_fn: CrossEntropyLoss # MSELoss, BCEWithLogitsLoss, RMSELoss, FOCALLoss
 gamma: 0. # FOCALLoss
 
 ##### Optimizer ########################################
@@ -60,7 +60,7 @@ last_nomix_epoch: 0
 
 ##### Data Augmentation #################################
 train_aug:
-  RandomResizedCrop:
+  Resize:
     height: ${img_size}
     width: ${img_size}
     p: 1.0
