@@ -64,7 +64,9 @@ def split_data(cfg, lmdb_dir):
                 # load json
                 label_key = f'label-{str(idx).zfill(8)}'.encode()
                 label = txn.get(label_key).decode('utf-8')
-                labels.append(cfg.chart_type2label[label])
+            json_dict = json.loads(label)
+            label = cfg.chart_type2label(json_dict['chart-type'])
+            labels.append(label)
         for fold, (train_fold_indices, vaild_fold_indices) \
                 in enumerate(StratifiedKFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(indices, labels)):
             indices_dict[fold]['train'] = train_fold_indices
