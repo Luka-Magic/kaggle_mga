@@ -11,15 +11,7 @@ save_model: true
 from_lmdb: true
 
 ######   Model   #######################################
-chart_type2label:
-  line: 0
-  vertical_bar: 1
-  scatter: 2
-  dot: 3
-  horizontal_bar: 4
-
-######   Model   #######################################
-model_arch: swin_large_patch4_window7_384
+model_arch: centernet
 pretrained: true
 input_size: 3
 output_size: 5

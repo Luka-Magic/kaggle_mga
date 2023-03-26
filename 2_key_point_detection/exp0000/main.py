@@ -39,7 +39,7 @@ import albumentations
 from albumentations.pytorch import ToTensorV2
 
 from utils import seed_everything, AverageMeter
-
+from model import CenterNet
 
 def split_data(cfg, lmdb_dir):
     indices_dict = {}
@@ -129,16 +129,6 @@ def get_transforms(cfg, phase):
             for name, kwargs in aug.items()]
     augs.append(ToTensorV2(p=1.))
     return albumentations.Compose(augs)
-
-
-class MgaModel(nn.Module):
-    def __init__(self, cfg):
-        super().__init__()
-        self.model = timm.create_model(
-            cfg.model_arch, pretrained=cfg.pretrained, in_chans=cfg.input_size, num_classes=cfg.output_size)
-
-    def forward(self, x):
-        return self.model(x)
 
 
 def prepare_dataloader(cfg, lmdb_dir, train_indices, valid_indices):
@@ -283,7 +273,8 @@ def main():
         }
 
         # model
-        model = MgaModel(cfg)
+        if cfg.model_arch == 'keypointrcnn_resnet50_fpn':
+            model = torchvision.models.detection.keypointrcnn_resnet50_fpn()
 
         # loss
         if cfg.loss_fn == 'CrossEntropyLoss':
@@ -321,36 +312,36 @@ def main():
             print(f'    Valid Loss: {valid_loss:.5f}, Valid acc: {valid_accuracy*100:.3f}%')
             print('-'*80)
         
-        # save model
-        save_dict = {
-            'epoch': epoch,
-            'valid_loss': valid_loss,
-            'valid_accuracy': valid_accuracy,
-            'model': model.state_dict()
-        }
-        if valid_loss < best_loss:
-            best_loss = valid_loss
-            torch.save(save_dict, str(SAVE_DIR / 'best_loss.pth'))
-            if cfg.use_wandb:
-                wandb.run.summary['best_loss'] = best_loss
-        if valid_accuracy > best_accuracy:
-            best_accuracy = valid_accuracy
-            torch.save(save_dict, str(SAVE_DIR / 'best_accuracy.pth'))
-            if cfg.use_wandb:
-                wandb.run.summary['best_accuracy'] = best_accuracy
-        del save_dict
-        gc.collect()
-
-        # wandb
-        if cfg.use_wandb:
-            wandb.log({
+            # save model
+            save_dict = {
                 'epoch': epoch,
-                'train_loss': train_loss,
-                'train_accuracy': train_accuracy,
-                'lr': lr,
                 'valid_loss': valid_loss,
-                'valid_accuracy': valid_accuracy
-            })
+                'valid_accuracy': valid_accuracy,
+                'model': model.state_dict()
+            }
+            if valid_loss < best_loss:
+                best_loss = valid_loss
+                torch.save(save_dict, str(SAVE_DIR / 'best_loss.pth'))
+                if cfg.use_wandb:
+                    wandb.run.summary['best_loss'] = best_loss
+            if valid_accuracy > best_accuracy:
+                best_accuracy = valid_accuracy
+                torch.save(save_dict, str(SAVE_DIR / 'best_accuracy.pth'))
+                if cfg.use_wandb:
+                    wandb.run.summary['best_accuracy'] = best_accuracy
+            del save_dict
+            gc.collect()
+
+            # wandb
+            if cfg.use_wandb:
+                wandb.log({
+                    'epoch': epoch,
+                    'train_loss': train_loss,
+                    'train_accuracy': train_accuracy,
+                    'lr': lr,
+                    'valid_loss': valid_loss,
+                    'valid_accuracy': valid_accuracy
+                })
     wandb.finish()
     del model, train_loader, valid_loader, loss_fn, optimizer, scheduler, best_loss, best_accuracy
 

@@ -74,7 +74,6 @@ def split_data(cfg, lmdb_dir):
                 'train': train_fold_indices,
                 'valid': vaild_fold_indices
             }
-    print(len(indices_dict[0]['train']), len(indices_dict[0]['valid']))
     return indices_dict
 
 # Lmdb Dataset
@@ -325,36 +324,36 @@ def main():
             print(f'    Valid Loss: {valid_loss:.5f}, Valid acc: {valid_accuracy*100:.3f}%')
             print('-'*80)
         
-        # save model
-        save_dict = {
-            'epoch': epoch,
-            'valid_loss': valid_loss,
-            'valid_accuracy': valid_accuracy,
-            'model': model.state_dict()
-        }
-        if valid_loss < best_loss:
-            best_loss = valid_loss
-            torch.save(save_dict, str(SAVE_DIR / 'best_loss.pth'))
-            if cfg.use_wandb:
-                wandb.run.summary['best_loss'] = best_loss
-        if valid_accuracy > best_accuracy:
-            best_accuracy = valid_accuracy
-            torch.save(save_dict, str(SAVE_DIR / 'best_accuracy.pth'))
-            if cfg.use_wandb:
-                wandb.run.summary['best_accuracy'] = best_accuracy
-        del save_dict
-        gc.collect()
-
-        # wandb
-        if cfg.use_wandb:
-            wandb.log({
+            # save model
+            save_dict = {
                 'epoch': epoch,
-                'train_loss': train_loss,
-                'train_accuracy': train_accuracy,
-                'lr': lr,
                 'valid_loss': valid_loss,
-                'valid_accuracy': valid_accuracy
-            })
+                'valid_accuracy': valid_accuracy,
+                'model': model.state_dict()
+            }
+            if valid_loss < best_loss:
+                best_loss = valid_loss
+                torch.save(save_dict, str(SAVE_DIR / 'best_loss.pth'))
+                if cfg.use_wandb:
+                    wandb.run.summary['best_loss'] = best_loss
+            if valid_accuracy > best_accuracy:
+                best_accuracy = valid_accuracy
+                torch.save(save_dict, str(SAVE_DIR / 'best_accuracy.pth'))
+                if cfg.use_wandb:
+                    wandb.run.summary['best_accuracy'] = best_accuracy
+            del save_dict
+            gc.collect()
+
+            # wandb
+            if cfg.use_wandb:
+                wandb.log({
+                    'epoch': epoch,
+                    'train_loss': train_loss,
+                    'train_accuracy': train_accuracy,
+                    'lr': lr,
+                    'valid_loss': valid_loss,
+                    'valid_accuracy': valid_accuracy
+                })
     wandb.finish()
     del model, train_loader, valid_loader, loss_fn, optimizer, scheduler, best_loss, best_accuracy
 
