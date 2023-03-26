@@ -98,11 +98,10 @@ def main():
     cache = {}
     n_images = len(img_path_list)
 
-    count = 0
+    count = 1
 
     for i, img_path in tqdm(enumerate(img_path_list), total=n_images):
         id_ = img_path.stem
-        i += 1
         # json
         json_path = TRAIN_LABEL_DIR / (img_path.stem + '.json')
         with open(json_path, 'r') as f:
@@ -116,18 +115,18 @@ def main():
         with open(img_path, 'rb') as f:
             img_bin = f.read()
         # key
-        img_key = f'image-{str(i).zfill(8)}'.encode()
-        label_key = f'label-{str(i).zfill(8)}'.encode()
+        img_key = f'image-{str(count).zfill(8)}'.encode()
+        label_key = f'label-{str(count).zfill(8)}'.encode()
 
         cache[img_key] = img_bin
         cache[label_key] = json_bin
-
-        count += 1
 
         if i % 1000 == 0:
             cache['num-samples'.encode()] = str(count).encode()
             write_cache(env, cache)
             cache = {}
+        
+        count += 1
     cache['num-samples'.encode()] = str(count).encode()
     write_cache(env, cache)
 
