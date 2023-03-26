@@ -252,7 +252,7 @@ def main():
 
     ROOT_DIR = Path.cwd().parents[2]
     exp_name = EXP_PATH.name
-    LMDB_DIR = ROOT_DIR / 'data' / cfg.data_name / 'lmdb'
+    LMDB_DIR = ROOT_DIR / 'data' / cfg.dataset_name / 'lmdb'
     SAVE_DIR = ROOT_DIR / 'outputs' / exp_name
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
