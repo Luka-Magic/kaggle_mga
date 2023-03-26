@@ -193,7 +193,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
     
     for _, (images, labels) in pbar:
         images = images.to(device).float()
-        labels = labels.to(device).float()
+        labels = labels.to(device).long()
         bs = len(images)
 
         with autocast(enabled=cfg.use_amp):
@@ -232,7 +232,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
     
     for _, (images, labels) in pbar:
         images = images.to(device).float()
-        labels = labels.to(device).float()
+        labels = labels.to(device).long()
         bs = len(images)
 
         with torch.no_grad():
@@ -287,11 +287,11 @@ def main():
         }
 
         # model
-        model = MgaModel(cfg)
+        model = MgaModel(cfg).to(device)
 
         # loss
         if cfg.loss_fn == 'CrossEntropyLoss':
-            loss_fn = torch.nn.CrossEntropyLoss(cfg.output_size)
+            loss_fn = torch.nn.CrossEntropyLoss()
         else:
             NotImplementedError
         
