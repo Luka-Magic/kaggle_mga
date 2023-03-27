@@ -148,7 +148,7 @@ class MgaLmdbDataset(Dataset):
         heatmap = self._create_heatmap(keypoints)
 
         img = torch.from_numpy(img).permute(2, 0, 1)
-        heatmap = torch.from_numpy(heatmap).permute(2, 0, 1)
+        heatmap = torch.from_numpy(heatmap)
         heatmap_weight = torch.from_numpy(heatmap_weight)
 
         return img, heatmap, heatmap_weight
@@ -220,7 +220,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         bs = len(images)
 
         print(images.shape)
-        print(heatmaps.shape)
+        print(heatmaps.shape) # おかしい
         print(heatmap_weight.shape)
 
         with autocast(enabled=cfg.use_amp):
