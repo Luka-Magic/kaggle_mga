@@ -219,10 +219,6 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         heatmap_weight = heatmap_weight.to(device).long()
         bs = len(images)
 
-        print(images.shape)
-        print(heatmaps.shape) # おかしい
-        print(heatmap_weight.shape)
-
         with autocast(enabled=cfg.use_amp):
             pred = model(images)
             loss = loss_fn(pred, heatmaps, heatmap_weight)
