@@ -73,9 +73,12 @@ class Hourglass(nn.Module):
         return nn.ModuleList(hg)
 
     def _hour_glass_forward(self, n, x):
+        print('x: ', x.shape)
         up1 = self.hg[n-1][0](x)
+        print('up1: ', up1.shape)
         low1 = F.max_pool2d(x, 2, stride=2)
         low1 = self.hg[n-1][1](low1)
+        print('low1: ', low1.shape)
 
         if n > 1:
             low2 = self._hour_glass_forward(n-1, low1)
