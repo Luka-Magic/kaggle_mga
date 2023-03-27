@@ -73,8 +73,8 @@ def split_data(cfg, lmdb_dir):
         max_x, max_y = min_x + w, min_y + h
         joint_min_x, joint_min_y = np.amin(joints, 0)
         joint_max_x, joint_max_y = np.amax(joints, 0)
-        if joint_min_x < min_x or \
-           joint_min_y < min_y or \
+        if joint_min_x < max(min_x, 0) or \
+           joint_min_y < max(min_y, 0) or \
            joint_max_x > max_x or \
            joint_max_y > max_y:
             continue
@@ -117,7 +117,6 @@ class MgaLmdbDataset(Dataset):
         self.n_joints = cfg.output_size
         self.sigma = cfg.sigma
         self.heatmap_size = [cfg.heatmap_h, cfg.heatmap_w]
-
 
     def _create_heatmap(self, joints):
         '''
