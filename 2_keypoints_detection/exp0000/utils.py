@@ -84,7 +84,7 @@ def get_max_preds(batch_heatmaps):
     pred_mask = pred_mask.astype(np.float32)
 
     preds *= pred_mask
-    return preds, 
+    return preds, maxvals
 
 
 def calc_accuracy(output, target, hm_type='gaussian', thr=0.5):
