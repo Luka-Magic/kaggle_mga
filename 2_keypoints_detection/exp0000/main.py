@@ -56,7 +56,7 @@ def split_data(cfg, lmdb_dir):
     indices = []
 
     # check data
-    for idx in range(n_samples):
+    for idx in tqdm(range(n_samples), total=n_sample):
         with env.begin(write=False) as txn:
             idx += 1
             # load json
