@@ -94,8 +94,6 @@ def calc_accuracy(output, target, hm_type='gaussian', thr=0.5):
     First value to be returned is average accuracy across 'idxs',
     followed by individual accuracies
     '''
-    print(output.shape)
-    print(target.shape)
     idx = list(range(output.shape[1]))
     norm = 1.0
     if hm_type == 'gaussian':
