@@ -87,7 +87,7 @@ class MgaLmdbDataset(Dataset):
         self.transforms = transforms
         self.indices = indices
         self.env = lmdb.open(str(lmdb_dir), max_readers=32, readonly=True, lock=False, readahead=False, meminit=False)
-        self.n_jouints = cfg.output_size
+        self.n_joints = cfg.output_size
         self.sigma = cfg.sigma
         self.heatmap_size = [cfg.heatmap_h, cfg.heatmap_w]
 
