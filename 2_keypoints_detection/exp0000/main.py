@@ -137,7 +137,7 @@ class MgaLmdbDataset(Dataset):
         
         # label
         json_dict = json.loads(label)
-        keypoints = [(dic['x'], dic['y']) for dic in json_dict['key_point']]
+        keypoints = [[dic['x'], dic['y']] for dic in json_dict['key_point']]
         n_joints = len(keypoints)
 
         transformed = self.transforms(image=img, keypoints=keypoints)
