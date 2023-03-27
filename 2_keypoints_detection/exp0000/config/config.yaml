@@ -10,6 +10,14 @@ use_fold: [0] # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 save_model: true
 from_lmdb: true
 
+######   Label   #######################################
+chart_type2label:
+  line: 0
+  vertical_bar: 1
+  scatter: 2
+  dot: 3
+  horizontal_bar: 4
+
 ######   Model   #######################################
 model_arch: hourglassnet
 pretrained: true
