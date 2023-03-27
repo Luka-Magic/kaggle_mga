@@ -36,10 +36,13 @@ from torch.cuda.amp import autocast, GradScaler
 # other
 import timm
 import albumentations
+from albumentations import KeypointParams
 from albumentations.pytorch import ToTensorV2
 
-from utils import seed_everything, AverageMeter
-from model import CenterNet
+from utils import seed_everything, AverageMeter, calc_accuracy
+from model import get_pose_net
+from loss import JointsMSELoss
+
 
 def split_data(cfg, lmdb_dir):
     indices_dict = {}
@@ -81,8 +84,28 @@ class MgaLmdbDataset(Dataset):
         self.transforms = transforms
         self.indices = indices
         self.env = lmdb.open(str(lmdb_dir), max_readers=32, readonly=True, lock=False, readahead=False, meminit=False)
-        self.chart_type2label = cfg.chart_type2label
+        self.n_jouints = self.output_channel
+        self.sigma = cfg.sigma
+        self.heatmap_size = [cfg.heatmap_h, cfg.heatmap_w]
 
+
+    def _create_heatmap(self, joints):
+        '''
+            joints: [(x1, y1), (x2, y2), ...]
+            heatmap: size: (n_joints, hm_h, hm_w)
+        '''
+        heatmap = np.zeros(self.n_joints, self.heatmap_size[0], self.heatmap_size[1], dtype=np.float32)
+        for joint_id in range(self.n_joints):
+            mu_x = joints[joint_id][0]
+            mu_y = joints[joint_id][1]
+            
+            x = np.arange(0, self.heatmap_size[0], 1, np.float32)
+            y = np.arange(0, self.heatmap_size[1], 1, np.float32)
+            y = y[:, np.newaxis]
+
+            heatmap[joint_id] = np.exp(- ((x - mu_x) ** 2 + (y - mu_y) ** 2) / (2 * self.sigma ** 2))
+        return heatmap
+        
     def __len__(self):
         return len(self.indices)
     
@@ -108,13 +131,20 @@ class MgaLmdbDataset(Dataset):
         else:
             img = np.array(Image.open(buf).convert('L'))
         
-        img = self.transforms(image=img)['image']
-
         # label
         json_dict = json.loads(label)
-        label = json_dict['key_point']
+        keypoints = [(dic['x'], dic['y']) for dic in json_dict['key_point']]
 
-        return img, label
+        transformed = self.transforms(image=img, keypoints=keypoints)
+        img = transformed['image']
+        keypoints = transformed['keypoints']
+
+        heatmap = self._create_heatmap(keypoints)
+
+        img = torch.from_numpy(img)
+        heatmap = torch.from_numpy(heatmap)
+
+        return img, heatmap
 
 
 def get_transforms(cfg, phase):
@@ -125,10 +155,9 @@ def get_transforms(cfg, phase):
     elif phase == 'tta':
         aug = cfg.tta_aug
 
-    augs = [getattr(albumentations, name)(**kwargs) if name != 'RandomAugMix' else RandomAugMix(**kwargs)
-            for name, kwargs in aug.items()]
-    augs.append(ToTensorV2(p=1.))
-    return albumentations.Compose(augs)
+    augs = [getattr(albumentations, name)(**kwargs) for name, kwargs in aug.items()]
+    # augs.append(ToTensorV2(p=1.))
+    return albumentations.Compose(augs, keypoint_params=KeypointParams(format='xy'))
 
 
 def prepare_dataloader(cfg, lmdb_dir, train_indices, valid_indices):
@@ -177,23 +206,23 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for _, (images, labels) in pbar:
+    for _, (images, heatmaps) in pbar:
         images = images.to(device).float()
-        labels = labels.to(device).float()
+        heatmaps = heatmaps.to(device).float()
         bs = len(images)
 
         with autocast(enabled=cfg.use_amp):
             pred = model(images)
-            loss = loss_fn(pred, labels)
+            loss = loss_fn(pred, heatmaps)
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
 
-        pred_labels = torch.argmax(pred.detach().cpu(), dim=1)
-        batch_accuracy = (pred_labels == labels.detach().cpu()).sum().item() / bs
-        accuracy.update(batch_accuracy, bs)
+        _, avg_acc, cnt, pred = calc_accuracy(pred.detach().cpu().numpy(),
+                                              heatmaps.detach().cpu().numpy())
+        accuracy.update(avg_acc, cnt)
         losses.update(loss.item(), bs)
         
         if scheduler_step_time == 'step':
@@ -216,18 +245,18 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for _, (images, labels) in pbar:
+    for _, (images, heatmaps) in pbar:
         images = images.to(device).float()
-        labels = labels.to(device).float()
+        heatmaps = heatmaps.to(device).float()
         bs = len(images)
 
         with torch.no_grad():
             pred = model(images)
-            loss = loss_fn(pred, labels)
+            loss = loss_fn(pred, heatmaps)
 
-        pred_labels = torch.argmax(pred.detach().cpu(), dim=1)
-        batch_accuracy = (pred_labels == labels.detach().cpu()).sum().item() / bs
-        accuracy.update(batch_accuracy, bs)
+        _, avg_acc, cnt, pred = calc_accuracy(pred.detach().cpu().numpy(),
+                                              heatmaps.detach().cpu().numpy())
+        accuracy.update(avg_acc, cnt)
         losses.update(loss.item(), bs)
         
         pbar.set_description(f'[Epoch {epoch}/{cfg.n_epochs}]')
@@ -273,12 +302,14 @@ def main():
         }
 
         # model
-        if cfg.model_arch == 'centernet':
-            model = CenterNet(n_classes=cfg.output_channel, pretrained=cfg.pretrained)
+        if cfg.model_arch == 'hourglassnet':
+            model = get_pose_net(cfg.output_channel)
+        else:
+            NotImplementedError
 
         # loss
-        if cfg.loss_fn == 'CrossEntropyLoss':
-            loss_fn = torch.nn.CrossEntropyLoss(cfg.output_size)
+        if cfg.loss_fn == 'JointsMSELoss':
+            loss_fn = JointsMSELoss()
         else:
             NotImplementedError
         

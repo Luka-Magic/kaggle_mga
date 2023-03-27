@@ -12,9 +12,9 @@
 
     - チャートを5種類に分類
 
-2. [key point detection](./2_key_point_detection/)
+2. [keypoints detection](./2_keypoints_detection/)
 
-    - key point detection
+    - keypoints detection
 
 3. [text detection](./3_text_detection/)
 
