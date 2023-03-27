@@ -12,6 +12,7 @@ from collections import OrderedDict, Counter
 import lmdb
 import six
 from PIL import Image
+from torchsummary import summary
 
 # hydra
 import hydra
@@ -147,8 +148,8 @@ class MgaLmdbDataset(Dataset):
 
         heatmap = self._create_heatmap(keypoints)
 
-        img = torch.from_numpy(img).permute(0, 3, 1, 2)
-        heatmap = torch.from_numpy(heatmap).permute(0, 3, 1, 2)
+        img = torch.from_numpy(img).permute(2, 0, 1)
+        heatmap = torch.from_numpy(heatmap).permute(2, 0, 1)
         heatmap_weight = torch.from_numpy(heatmap_weight)
 
         return img, heatmap, heatmap_weight
@@ -314,6 +315,7 @@ def main():
             model = get_pose_net(cfg.output_size).to(device)
         else:
             NotImplementedError
+        print(summary(model, (3, 300, 500)))
 
         # loss
         if cfg.loss_fn == 'JointsMSELoss':
