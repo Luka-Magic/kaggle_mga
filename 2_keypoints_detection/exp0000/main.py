@@ -147,8 +147,8 @@ class MgaLmdbDataset(Dataset):
 
         heatmap = self._create_heatmap(keypoints)
 
-        img = torch.from_numpy(img)
-        heatmap = torch.from_numpy(heatmap)
+        img = torch.from_numpy(img).permute(0, 3, 1, 2)
+        heatmap = torch.from_numpy(heatmap).permute(0, 3, 1, 2)
         heatmap_weight = torch.from_numpy(heatmap_weight)
 
         return img, heatmap, heatmap_weight
