@@ -138,7 +138,6 @@ class MgaLmdbDataset(Dataset):
         # label
         json_dict = json.loads(label)
         keypoints = [[dic['x'], dic['y']] for dic in json_dict['key_point']]
-        n_joints = len(keypoints)
 
         transformed = self.transforms(image=img, keypoints=keypoints)
         img = transformed['image']
@@ -220,6 +219,10 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         heatmap_weight = heatmap_weight.to(device).long()
         bs = len(images)
 
+        print(images[0])
+        print(heatmaps[0])
+        print(heatmap_weight[0])
+
         with autocast(enabled=cfg.use_amp):
             pred = model(images)
             loss = loss_fn(pred, heatmaps, heatmap_weight)
@@ -254,14 +257,15 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for _, (images, heatmaps) in pbar:
+    for _, (images, heatmaps, heatmap_weight) in pbar:
         images = images.to(device).float()
         heatmaps = heatmaps.to(device).float()
+        heatmap_weight = heatmap_weight.to(device).long()
         bs = len(images)
 
         with torch.no_grad():
             pred = model(images)
-            loss = loss_fn(pred, heatmaps)
+            loss = loss_fn(pred, heatmaps, heatmap_weight)
 
         _, avg_acc, cnt, pred = calc_accuracy(pred.detach().cpu().numpy(),
                                               heatmaps.detach().cpu().numpy())
