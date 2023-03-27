@@ -137,17 +137,21 @@ class MgaLmdbDataset(Dataset):
         # label
         json_dict = json.loads(label)
         keypoints = [(dic['x'], dic['y']) for dic in json_dict['key_point']]
+        n_joints = len(keypoints)
 
         transformed = self.transforms(image=img, keypoints=keypoints)
         img = transformed['image']
         keypoints = transformed['keypoints']
+        heatmap_weight = np.zeros(self.n_joints, dtype=np.int32)
+        heatmap_weight[:len(keypoints)] = 1
 
         heatmap = self._create_heatmap(keypoints)
 
         img = torch.from_numpy(img)
         heatmap = torch.from_numpy(heatmap)
+        heatmap_weight = torch.from_numpy(heatmap_weight)
 
-        return img, heatmap
+        return img, heatmap, heatmap_weight
 
 
 def get_transforms(cfg, phase):
@@ -209,14 +213,15 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for _, (images, heatmaps) in pbar:
+    for _, (images, heatmaps, heatmap_weight) in pbar:
         images = images.to(device).float()
         heatmaps = heatmaps.to(device).float()
+        heatmap_weight = heatmap_weight.to(device).long()
         bs = len(images)
 
         with autocast(enabled=cfg.use_amp):
             pred = model(images)
-            loss = loss_fn(pred, heatmaps)
+            loss = loss_fn(pred, heatmaps, heatmap_weight)
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
@@ -306,7 +311,7 @@ def main():
 
         # model
         if cfg.model_arch == 'hourglassnet':
-            model = get_pose_net(cfg.output_size)
+            model = get_pose_net(cfg.output_size).to(device)
         else:
             NotImplementedError
 
