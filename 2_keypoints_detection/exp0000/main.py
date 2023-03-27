@@ -315,7 +315,7 @@ def main():
             model = get_pose_net(cfg.output_size).to(device)
         else:
             NotImplementedError
-        print(summary(model, (3, 300, 500)))
+        # print(summary(model, (3, 300, 500)))
 
         # loss
         if cfg.loss_fn == 'JointsMSELoss':
