@@ -53,9 +53,32 @@ def split_data(cfg, lmdb_dir):
         n_samples = int(txn.get('num-samples'.encode()))
     
     labels = []
-    indices = list(range(n_samples))
+    indices = []
 
-    if  cfg.split_method == 'KFold':
+    # check data
+    for idx in range(n_samples):
+        with env.begin(write=False) as txn:
+            idx += 1
+            # load json
+            label_key = f'label-{str(idx).zfill(8)}'.encode()
+            label = txn.get(label_key).decode('utf-8')
+        json_dict = json.loads(label)
+        joints = np.array([[d['x'], d['y']] for d in json_dict['key_point']])
+
+        h, w, min_x, min_y = json_dict['plot-bb'].values()
+        max_x, max_y = min_x + w, min_y + h
+        joint_min_x, joint_min_y = np.amin(joints, 0)
+        joint_max_x, joint_max_y = np.amax(joints, 0)
+        if joint_min_x < min_x or \
+           joint_min_y < min_y or \
+           joint_max_x > max_x or \
+           joint_max_y > max_y:
+            continue
+        indices.append(idx)
+    print('num-samples: ', len(indices))
+# {'height': 145, 'width': 384, 'x0': 92, 'y0': 34},
+
+    if cfg.split_method == 'KFold':
         for fold, (train_fold_indices, vaild_fold_indices) \
                 in enumerate(KFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(indices)):
             indices_dict[fold] = {
@@ -63,9 +86,8 @@ def split_data(cfg, lmdb_dir):
                 'valid': vaild_fold_indices
             }
     elif cfg.split_method == 'StratifiedKFold':
-        for idx in range(n_samples):
+        for idx in indices:
             with env.begin(write=False) as txn:
-                idx += 1
                 # load json
                 label_key = f'label-{str(idx).zfill(8)}'.encode()
                 label = txn.get(label_key).decode('utf-8')
@@ -116,8 +138,6 @@ class MgaLmdbDataset(Dataset):
     def __getitem__(self, idx):
         idx = self.indices[idx]
         with self.env.begin(write=False) as txn:
-            idx += 1
-
             # load image
             img_key = f'image-{str(idx).zfill(8)}'.encode()
             imgbuf = txn.get(img_key)
