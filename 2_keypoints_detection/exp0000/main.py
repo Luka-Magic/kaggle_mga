@@ -57,8 +57,10 @@ def split_data(cfg, lmdb_dir):
     if  cfg.split_method == 'KFold':
         for fold, (train_fold_indices, vaild_fold_indices) \
                 in enumerate(KFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(indices)):
-            indices_dict[fold]['train'] = train_fold_indices
-            indices_dict[fold]['valid'] = vaild_fold_indices
+            indices_dict[fold] = {
+                'train': train_fold_indices,
+                'valid': vaild_fold_indices
+            }
     elif cfg.split_method == 'StratifiedKFold':
         for idx in range(n_samples):
             with env.begin(write=False) as txn:
@@ -71,9 +73,10 @@ def split_data(cfg, lmdb_dir):
             labels.append(label)
         for fold, (train_fold_indices, vaild_fold_indices) \
                 in enumerate(StratifiedKFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(indices, labels)):
-            indices_dict[fold]['train'] = train_fold_indices
-            indices_dict[fold]['valid'] = vaild_fold_indices
-
+            indices_dict[fold] = {
+                'train': train_fold_indices,
+                'valid': vaild_fold_indices
+            }
     return indices_dict
 
 # Lmdb Dataset
@@ -227,7 +230,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         
         if scheduler_step_time == 'step':
             scheduler.step()
-        pbar.set_description(f'[Epoch {epoch}/{cfg.n_epochs}]')
+        pbar.set_description(f'[Train epoch {epoch}/{cfg.n_epochs}]')
         pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
     if scheduler_step_time == 'epoch':
         scheduler.step()
@@ -259,7 +262,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
         accuracy.update(avg_acc, cnt)
         losses.update(loss.item(), bs)
         
-        pbar.set_description(f'[Epoch {epoch}/{cfg.n_epochs}]')
+        pbar.set_description(f'[Valid epoch {epoch}/{cfg.n_epochs}]')
         pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
     
     return losses.avg, accuracy.avg
@@ -327,16 +330,16 @@ def main():
                 optimizer, T_0=cfg.T_0, eta_min=cfg.eta_min)
         elif cfg.scheduler == 'OneCycleLR':
             scheduler = optim.lr_scheduler.OneCycleLR(
-                optimizer, total_steps=cfg.epoch * len(train_loader), max_lr=cfg.lr, pct_start=cfg.pct_start, div_factor=cfg.div_factor, final_div_factor=cfg.final_div_factor)
+                optimizer, total_steps=cfg.n_epochs * len(train_loader), max_lr=cfg.lr, pct_start=cfg.pct_start, div_factor=cfg.div_factor, final_div_factor=cfg.final_div_factor)
         else:
             NotImplementedError
         
         # grad scaler
-        scaler = GradScaler()
+        scaler = GradScaler(enabled=cfg.use_amp)
 
-        for epoch in range(1, cfg.epoch + 1):
+        for epoch in range(1, cfg.n_epochs + 1):
             train_loss, train_accuracy, lr = train_one_epoch(cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
-            valid_loss, valid_accuracy =  valid_one_epoch(cfg, epoch, train_loader, model, loss_fn, device)
+            valid_loss, valid_accuracy =  valid_one_epoch(cfg, epoch, valid_loader, model, loss_fn, device)
             print('-'*80)
             print(f'Epoch {epoch}/{cfg.n_epochs}')
             print(f'    Train Loss: {train_loss:.5f}, Train acc: {train_accuracy*100:.3f}%, lr: {lr:.7f}')
@@ -350,16 +353,16 @@ def main():
                 'valid_accuracy': valid_accuracy,
                 'model': model.state_dict()
             }
-            if valid_loss < best_loss:
-                best_loss = valid_loss
+            if valid_loss < best_score['loss']:
+                best_score['loss'] = valid_loss
                 torch.save(save_dict, str(SAVE_DIR / 'best_loss.pth'))
                 if cfg.use_wandb:
-                    wandb.run.summary['best_loss'] = best_loss
-            if valid_accuracy > best_accuracy:
-                best_accuracy = valid_accuracy
+                    wandb.run.summary['best_loss'] = best_score['loss']
+            if valid_accuracy > best_score['accuracy']:
+                best_score['accuracy'] = valid_accuracy
                 torch.save(save_dict, str(SAVE_DIR / 'best_accuracy.pth'))
                 if cfg.use_wandb:
-                    wandb.run.summary['best_accuracy'] = best_accuracy
+                    wandb.run.summary['best_accuracy'] = best_score['accuracy']
             del save_dict
             gc.collect()
 
