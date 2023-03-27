@@ -98,7 +98,7 @@ class MgaLmdbDataset(Dataset):
             heatmap: size: (n_joints, hm_h, hm_w)
         '''
         heatmap = np.zeros((self.n_joints, self.heatmap_size[1], self.heatmap_size[0]), dtype=np.float32)
-        for joint_id in range(self.n_joints):
+        for joint_id in range(len(joints)):
             mu_x = joints[joint_id][0]
             mu_y = joints[joint_id][1]
             
