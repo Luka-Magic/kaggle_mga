@@ -87,7 +87,7 @@ class MgaLmdbDataset(Dataset):
         self.transforms = transforms
         self.indices = indices
         self.env = lmdb.open(str(lmdb_dir), max_readers=32, readonly=True, lock=False, readahead=False, meminit=False)
-        self.n_jouints = cfg.output_channel
+        self.n_jouints = cfg.output_size
         self.sigma = cfg.sigma
         self.heatmap_size = [cfg.heatmap_h, cfg.heatmap_w]
 
@@ -306,7 +306,7 @@ def main():
 
         # model
         if cfg.model_arch == 'hourglassnet':
-            model = get_pose_net(cfg.output_channel)
+            model = get_pose_net(cfg.output_size)
         else:
             NotImplementedError
 
