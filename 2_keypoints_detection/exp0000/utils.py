@@ -33,6 +33,8 @@ class AverageMeter(object):
 
 
 def calc_dists(preds, target, normalize):
+    print(preds.shape)
+    print(target.shape)
     preds = preds.astype(np.float32)
     target = target.astype(np.float32)
     dists = np.zeros((preds.shape[1], preds.shape[0]))
