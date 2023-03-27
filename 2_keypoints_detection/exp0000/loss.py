@@ -11,6 +11,8 @@ class JointsMSELoss(nn.Module):
         num_joints = output.size(1)
         heatmaps_pred = output.reshape((batch_size, num_joints, -1)).split(1, 1)
         heatmaps_gt = target.reshape((batch_size, num_joints, -1)).split(1, 1)
+        print(heatmaps_pred.shape)
+        print(heatmaps_gt.shape)
         loss = 0
 
         for idx in range(num_joints):
