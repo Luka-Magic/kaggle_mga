@@ -66,8 +66,7 @@ def split_data(cfg, lmdb_dir):
         try:
             joints = np.array([[d['x'], d['y']] for d in json_dict['key_point']])
         except:
-            print(json_dict['key_point'])
-            exit()
+            continue
         if len(joints) < 0:
             continue
         h, w, min_x, min_y = json_dict['plot-bb'].values()
