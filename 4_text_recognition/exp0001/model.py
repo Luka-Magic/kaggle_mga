@@ -37,9 +37,9 @@ class CRNN(nn.Module):
         """ Sequence modeling"""
         if cfg.SequenceModeling == 'BiLSTM':
             self.SequenceModeling = nn.Sequential(
-                BidirectionalLSTM(self.FeatureExtraction_output, cfg.hidden_size, cfg.hidden_size),
-                BidirectionalLSTM(cfg.hidden_size, cfg.hidden_size, cfg.hidden_size))
-            self.SequenceModeling_output = cfg.hidden_size
+                BidirectionalLSTM(self.FeatureExtraction_output, cfg.hidden_channel, cfg.hidden_channel),
+                BidirectionalLSTM(cfg.hidden_channel, cfg.hidden_channel, cfg.hidden_channel))
+            self.SequenceModeling_output = cfg.hidden_channel
         else:
             print('No SequenceModeling module specified')
             self.SequenceModeling_output = self.FeatureExtraction_output
@@ -48,7 +48,7 @@ class CRNN(nn.Module):
         if cfg.Prediction == 'CTC':
             self.Prediction = nn.Linear(self.SequenceModeling_output, cfg.num_class)
         elif cfg.Prediction == 'Attn':
-            self.Prediction = Attention(self.SequenceModeling_output, cfg.hidden_size, cfg.num_class)
+            self.Prediction = Attention(self.SequenceModeling_output, cfg.hidden_channel, cfg.num_class)
         else:
             raise Exception('Prediction is neither CTC or Attn')
 
