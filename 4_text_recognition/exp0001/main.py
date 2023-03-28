@@ -78,11 +78,10 @@ def split_data(cfg, lmdb_dir):
             }
     elif  cfg.split_method == 'GroupKFold':
         groups = []
-        for idx in range(n_samples):
+        for idx in indices:
             with env.begin(write=False) as txn:
-                idx += 1
                 # load json
-                label_key = f'label-{str(idx).zfill(8)}'.encode()
+                label_key = f'label-{str(idx+1).zfill(8)}'.encode()
                 label = txn.get(label_key).decode('utf-8')
             json_dict = json.loads(label)
             id_ = json_dict['id']
