@@ -67,7 +67,7 @@ def split_data(cfg, lmdb_dir):
     #         continue
     #     indices.append(idx)
     indices = list(range(n_samples))
-    
+
     print('num-samples: ', len(indices))
 
     if  cfg.split_method == 'KFold':
@@ -240,6 +240,7 @@ def main():
     
     with open(CHAR_PATH, 'r') as f:
         character = f.read()
+        n_chars = len(character)
 
     for fold in cfg.use_fold:
 
@@ -258,7 +259,7 @@ def main():
         }
 
         # model
-        model = CRNN(cfg).to(device)
+        model = CRNN(cfg, n_chars).to(device)
 
         # loss
         if cfg.loss_fn == 'CTCLoss':

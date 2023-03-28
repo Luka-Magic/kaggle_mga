@@ -7,7 +7,7 @@ from modules.sequence_modeling import BidirectionalLSTM
 from modules.prediction import Attention
 
 class CRNN(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg, n_chars):
         super().__init__()
         self.cfg = cfg
         self.stages = {'Trans': cfg.Transformation, 'Feat': cfg.FeatureExtraction,
@@ -46,9 +46,9 @@ class CRNN(nn.Module):
 
         """ Prediction """
         if cfg.Prediction == 'CTC':
-            self.Prediction = nn.Linear(self.SequenceModeling_output, cfg.num_class)
+            self.Prediction = nn.Linear(self.SequenceModeling_output, n_chars)
         elif cfg.Prediction == 'Attn':
-            self.Prediction = Attention(self.SequenceModeling_output, cfg.hidden_channel, cfg.num_class)
+            self.Prediction = Attention(self.SequenceModeling_output, cfg.hidden_channel, n_chars)
         else:
             raise Exception('Prediction is neither CTC or Attn')
 
