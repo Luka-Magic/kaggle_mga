@@ -50,7 +50,24 @@ def split_data(cfg, lmdb_dir):
     with env.begin(write=False) as txn:
         n_samples = int(txn.get('num-samples'.encode()))
     
-    indices = list(range(n_samples))
+    indices = []
+    # check data
+    for idx in tqdm(range(n_samples), total=n_samples):
+        with env.begin(write=False) as txn:
+            # load json
+            label_key = f'label-{str(idx+1).zfill(8)}'.encode()
+            label = txn.get(label_key).decode('utf-8')
+        json_dict = json.loads(label)
+
+        # 条件
+        text = json_dict['text']
+        if len(text) > 25:
+            continue
+        if json_dict['img-size']['height'] < 5 or json_dict['img-size']['width'] < 5:
+            continue
+        indices.append(idx)
+
+    print('num-samples: ', len(indices))
 
     if  cfg.split_method == 'KFold':
         for fold, (train_fold_indices, vaild_fold_indices) \

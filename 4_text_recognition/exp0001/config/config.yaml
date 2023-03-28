@@ -11,7 +11,7 @@ save_model: true
 use_amp: true
 
 ######   Data   ########################################
-batch_max_length: 20
+batch_max_length: 25
 
 ######   Model   #######################################
 TPS: true
