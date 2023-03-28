@@ -65,7 +65,7 @@ def split_data(cfg, lmdb_dir):
             joints = np.array([[d['x'], d['y']] for d in json_dict['key_point']])
         except:
             continue
-        if len(joints) < 0:
+        if len(joints) == 0:
             continue
         # kp_min = np.amin(joints, 0)
         # if kp_min[0] < 0 or kp_min[1] < 0:
