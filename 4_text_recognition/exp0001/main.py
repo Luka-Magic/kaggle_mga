@@ -169,11 +169,11 @@ def train_one_epoch(cfg, epoch, dataloader, converter, model, loss_fn, device, o
 
         losses.update(loss.item(), bs)
         
-        if scheduler_step_time == 'step':
+        if scheduler_step_time == 'step' and scheduler is not None:
             scheduler.step()
         pbar.set_description(f'[Train epoch {epoch}/{cfg.n_epochs}]')
         pbar.set_postfix(OrderedDict(loss=losses.avg))
-    if scheduler_step_time == 'epoch':
+    if scheduler_step_time == 'epoch' and scheduler is not None:
         scheduler.step()
     
     lr = get_lr(optimizer)
@@ -273,7 +273,6 @@ def main():
         else:
             NotImplementedError
         
-        scheduler
         if cfg.scheduler == 'CosineAnnealingWarmRestarts':
             scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
                 optimizer, T_0=cfg.T_0, eta_min=cfg.eta_min)
@@ -281,7 +280,7 @@ def main():
             scheduler = optim.lr_scheduler.OneCycleLR(
                 optimizer, total_steps=cfg.n_epochs * len(train_loader), max_lr=cfg.lr, pct_start=cfg.pct_start, div_factor=cfg.div_factor, final_div_factor=cfg.final_div_factor)
         else:
-            NotImplementedError
+            scheduler = None
         
         # grad scaler
         scaler = GradScaler(enabled=cfg.use_amp)
