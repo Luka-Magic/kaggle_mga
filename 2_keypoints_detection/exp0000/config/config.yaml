@@ -1,7 +1,7 @@
 #####   BASIC   ########################################
 use_wandb: false
 wandb_project: kaggle_mga_keypoints_detection
-dataset_name: data0001
+dataset_name: data0002
 seed: 77
 n_epochs: 10
 split_method: KFold
