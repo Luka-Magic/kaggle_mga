@@ -2,7 +2,7 @@
 use_wandb: false
 wandb_project: kaggle_mga_text_recognition
 dataset_name: data0003
-split_method: GroupKFold
+split_method: KFold
 seed: 77
 n_folds: 5
 use_fold: [0]

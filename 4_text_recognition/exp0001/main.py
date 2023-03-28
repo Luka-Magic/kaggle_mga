@@ -249,7 +249,7 @@ def main():
                         name=f'{exp_name}', config=wandb.config)
             wandb.config.fold = fold
         
-        train_loader, valid_loader, _ = prepare_dataloader(cfg, LMDB_DIR, indices_dict[fold]['train'], indices_dict[fold]['valid'])
+        train_loader, valid_loader = prepare_dataloader(cfg, LMDB_DIR, indices_dict[fold]['train'], indices_dict[fold]['valid'])
 
         best_score = {
             'loss': float('inf'),
