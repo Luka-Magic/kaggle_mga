@@ -30,7 +30,7 @@ gamma: 0. # FOCALLoss
 
 ##### Optimizer ########################################
 optimizer: AdamW
-lr: 1e-2
+lr: 1e-3
 weight_decay: 1e-6
 
 ##### Scheduler ########################################
