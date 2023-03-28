@@ -80,7 +80,7 @@ def split_data(cfg, lmdb_dir):
         #     continue
         if joint_min_x < 0 or joint_min_y < 0:
             continue
-        indices.append(idx)
+        indices.append(idx - 1)
     print('num-samples: ', len(indices))
 
     if cfg.split_method == 'KFold':
@@ -141,7 +141,7 @@ class MgaLmdbDataset(Dataset):
         return len(self.indices)
     
     def __getitem__(self, idx):
-        idx = self.indices[idx]
+        idx = self.indices[idx] + 1
         with self.env.begin(write=False) as txn:
             # load image
             img_key = f'image-{str(idx).zfill(8)}'.encode()
