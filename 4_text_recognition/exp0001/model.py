@@ -16,7 +16,7 @@ class CRNN(nn.Module):
         """ Transformation """
         if cfg.Transformation == 'TPS':
             self.Transformation = TPS_SpatialTransformerNetwork(
-                F=cfg.num_fiducial, I_size=(cfg.imgH, cfg.imgW), I_r_size=(cfg.imgH, cfg.imgW), I_channel_num=cfg.input_channel)
+                F=cfg.num_fiducial, I_size=(cfg.img_h, cfg.img_w), I_r_size=(cfg.img_h, cfg.img_w), I_channel_num=cfg.input_channel)
         else:
             print('No Transformation module specified')
 
