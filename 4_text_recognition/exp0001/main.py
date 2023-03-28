@@ -165,6 +165,7 @@ def train_one_epoch(cfg, epoch, dataloader, converter, model, loss_fn, device, o
         
         scaler.scale(loss).backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
+        lr = get_lr(optimizer)
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
