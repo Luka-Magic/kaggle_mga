@@ -12,6 +12,7 @@ use_amp: true
 
 ######   Data   ########################################
 batch_max_length: 25
+padding: True
 
 ######   Model   #######################################
 TPS: true
@@ -54,42 +55,42 @@ valid_bs: 64
 num_workers: 2
 
 ##### Data Augmentation #################################
-train_aug:
-  Resize:
-    height: ${img_size}
-    width: ${img_size}
-    p: 1.0
-  Normalize:
-    mean: ${img_mean}
-    std: ${img_std}
-    max_pixel_value: 255.0
-    p: 1.0
+# train_aug:
+#   Resize:
+#     height: ${img_size}
+#     width: ${img_size}
+#     p: 1.0
+#   Normalize:
+#     mean: ${img_mean}
+#     std: ${img_std}
+#     max_pixel_value: 255.0
+#     p: 1.0
 
-valid_aug:
-  Resize:
-    height: ${img_size}
-    width: ${img_size}
-  Normalize:
-    mean: ${img_mean}
-    std: ${img_std}
-    max_pixel_value: 255.0
-    p: 1.0
+# valid_aug:
+#   Resize:
+#     height: ${img_size}
+#     width: ${img_size}
+#   Normalize:
+#     mean: ${img_mean}
+#     std: ${img_std}
+#     max_pixel_value: 255.0
+#     p: 1.0
 
-tta_aug:
-  Normalize:
-    mean: ${img_mean}
-    std: ${img_std}
-    max_pixel_value: 255.0
-    p: 1.0
-  Resize:
-    height: ${img_size}
-    width: ${img_size}
-  RandomResizedCrop:
-    height: ${img_size}
-    width: ${img_size}
-    scale: [0.3, 1.0]
-    p: 1.0
-  HorizontalFlip: 
-    p: 0.5
-  VerticalFlip: 
-    p: 0.5
+# tta_aug:
+#   Normalize:
+#     mean: ${img_mean}
+#     std: ${img_std}
+#     max_pixel_value: 255.0
+#     p: 1.0
+#   Resize:
+#     height: ${img_size}
+#     width: ${img_size}
+#   RandomResizedCrop:
+#     height: ${img_size}
+#     width: ${img_size}
+#     scale: [0.3, 1.0]
+#     p: 1.0
+#   HorizontalFlip: 
+#     p: 0.5
+#   VerticalFlip: 
+#     p: 0.5
