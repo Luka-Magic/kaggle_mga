@@ -270,7 +270,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
                                               heatmaps.detach().cpu().numpy())
         accuracy.update(avg_acc, cnt)
         losses.update(loss.item(), bs)
-        
+        lr =  get_lr(optimizer)
         if scheduler_step_time == 'step':
             scheduler.step()
         pbar.set_description(f'[Train epoch {epoch}/{cfg.n_epochs}]')
