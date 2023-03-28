@@ -54,7 +54,7 @@ def split_data(cfg, lmdb_dir):
     
     labels = []
     indices = []
-
+    invalid_ids = []
     # check data
     for idx in tqdm(range(n_samples), total=n_samples):
         with env.begin(write=False) as txn:
@@ -79,9 +79,12 @@ def split_data(cfg, lmdb_dir):
         #    joint_max_y > max_y:
         #     continue
         if joint_min_x < 0 or joint_min_y < 0:
+            invalid_ids = [json_dict['id']]
             continue
         indices.append(idx - 1)
+
     print('num-samples: ', len(indices))
+    print(invalid_ids)
 
     if cfg.split_method == 'KFold':
         for fold, (train_fold_indices, vaild_fold_indices) \
@@ -167,7 +170,8 @@ class MgaLmdbDataset(Dataset):
         kp_arr = np.array(keypoints)
         kp_min = np.amin(kp_arr, 0)
         if kp_min[0] < 0 or kp_min[1] < 0:
-            print(keypoints)
+            # print(keypoints)
+            print(json_dict['id'])
 
         transformed = self.transforms(image=img, keypoints=keypoints)
         img = transformed['image']
