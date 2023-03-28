@@ -8,7 +8,7 @@ n_folds: 5
 use_fold: [0]
 n_epochs: 30
 save_model: true
-use_amp: false
+use_amp: true
 
 ######   Data   ########################################
 batch_max_length: 25
@@ -23,6 +23,7 @@ num_fiducial: 20
 input_channel: 1
 hidden_channel: 256
 output_channel: 512
+grad_clip: 1
 
 ######   Loss   ########################################
 loss_fn: CTCLoss

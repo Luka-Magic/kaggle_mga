@@ -162,7 +162,9 @@ def train_one_epoch(cfg, epoch, dataloader, converter, model, loss_fn, device, o
             preds_size = torch.IntTensor([preds.size(1)] * bs) # (bs, )
             preds = preds.log_softmax(2).permute(1, 0, 2) # (length, bs, n_chars)
             loss = loss_fn(preds, text_encodes, preds_size, lengths)
+        
         scaler.scale(loss).backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
