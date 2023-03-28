@@ -67,18 +67,18 @@ def split_data(cfg, lmdb_dir):
             continue
         if len(joints) < 0:
             continue
-        kp_min = np.amin(joints, 0)
-        if kp_min[0] < 0 or kp_min[1] < 0:
-            continue
-        # h, w, min_x, min_y = json_dict['plot-bb'].values()
-        # max_x, max_y = min_x + w, min_y + h
-        # joint_min_x, joint_min_y = np.amin(joints, 0)
-        # joint_max_x, joint_max_y = np.amax(joints, 0)
-        # if joint_min_x < max(min_x, 0) or \
-        #    joint_min_y < max(min_y, 0) or \
-        #    joint_max_x > max_x or \
-        #    joint_max_y > max_y:
+        # kp_min = np.amin(joints, 0)
+        # if kp_min[0] < 0 or kp_min[1] < 0:
         #     continue
+        h, w, min_x, min_y = json_dict['plot-bb'].values()
+        max_x, max_y = min_x + w, min_y + h
+        joint_min_x, joint_min_y = np.amin(joints, 0)
+        joint_max_x, joint_max_y = np.amax(joints, 0)
+        if joint_min_x < max(min_x, 0) or \
+           joint_min_y < max(min_y, 0) or \
+           joint_max_x > max_x or \
+           joint_max_y > max_y:
+            continue
         # if joint_min_x < 0 or joint_min_y < 0:
         #     continue
         indices.append(idx)
