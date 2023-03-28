@@ -92,6 +92,7 @@ def split_data(cfg, lmdb_dir):
             }
     elif cfg.split_method == 'StratifiedKFold':
         for idx in indices:
+            idx += 1
             with env.begin(write=False) as txn:
                 # load json
                 label_key = f'label-{str(idx).zfill(8)}'.encode()
