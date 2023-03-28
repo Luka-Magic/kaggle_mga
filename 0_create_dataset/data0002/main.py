@@ -71,8 +71,8 @@ def anns2point_coors(json_dict, img_size):
             continue
         if np.isnan(ann_coor['x']) or np.isnan(ann_coor['y']):
             continue
-        if ann_coor['x'] < 0 or ann_coor['x'] > img_size[1] \
-            or ann_coor['y'] < 0 or ann_coor['y'] > img_size[0]:
+        if ann_coor['x'] <= 0 or ann_coor['x'] >= img_size[1] \
+            or ann_coor['y'] <= 0 or ann_coor['y'] >= img_size[0]:
             continue
         ann_coors.append(ann_coor)
     return ann_coors

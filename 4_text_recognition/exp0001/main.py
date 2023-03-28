@@ -22,7 +22,7 @@ from hydra.experimental import compose, initialize_config_dir
 import wandb
 
 # sklearn
-from sklearn.model_selection import KFold, StratifiedKFold
+from sklearn.model_selection import KFold, StratifiedKFold, GroupKFold
 
 # pytorch
 import torch
@@ -34,11 +34,14 @@ from torchvision.transforms import Compose
 from torch.cuda.amp import autocast, GradScaler
 
 # other
-import timm
+from torchsummary import summary
 import albumentations
 from albumentations.pytorch import ToTensorV2
 
-from utils import seed_everything, AverageMeter
+from model import CRNN
+from utils import seed_everything, AverageMeter, CTCLabelConverter
+from dataset import MgaLmdbDataset, AlignCollate
+
 
 def split_data(cfg, lmdb_dir):
     indices_dict = {}
@@ -47,7 +50,6 @@ def split_data(cfg, lmdb_dir):
     with env.begin(write=False) as txn:
         n_samples = int(txn.get('num-samples'.encode()))
     
-    labels = []
     indices = list(range(n_samples))
 
     if  cfg.split_method == 'KFold':
@@ -57,7 +59,25 @@ def split_data(cfg, lmdb_dir):
                 'train': train_fold_indices,
                 'valid': vaild_fold_indices
             }
+    elif  cfg.split_method == 'GroupKFold':
+        groups = []
+        for idx in range(n_samples):
+            with env.begin(write=False) as txn:
+                idx += 1
+                # load json
+                label_key = f'label-{str(idx).zfill(8)}'.encode()
+                label = txn.get(label_key).decode('utf-8')
+            json_dict = json.loads(label)
+            id_ = json_dict['id']
+            groups.append(id_)
+        for fold, (train_fold_indices, vaild_fold_indices) \
+                in enumerate(GroupKFold(n_splits=cfg.n_folds).split(indices, groups=groups)):
+            indices_dict[fold] = {
+                'train': train_fold_indices,
+                'valid': vaild_fold_indices
+            }
     elif cfg.split_method == 'StratifiedKFold':
+        labels = []
         for idx in range(n_samples):
             with env.begin(write=False) as txn:
                 idx += 1
@@ -75,87 +95,19 @@ def split_data(cfg, lmdb_dir):
             }
     return indices_dict
 
-# Lmdb Dataset
-class MgaLmdbDataset(Dataset):
-    def __init__(self, cfg, lmdb_dir, indices, transforms):
-        super().__init__()
-        self.cfg = cfg
-        self.transforms = transforms
-        self.indices = indices
-        self.env = lmdb.open(str(lmdb_dir), max_readers=32, readonly=True, lock=False, readahead=False, meminit=False)
-        self.chart_type2label = cfg.chart_type2label
-
-    def __len__(self):
-        return len(self.indices)
-    
-    def __getitem__(self, idx):
-        idx = self.indices[idx]
-        with self.env.begin(write=False) as txn:
-            idx += 1
-
-            # load image
-            img_key = f'image-{str(idx).zfill(8)}'.encode()
-            imgbuf = txn.get(img_key)
-
-            # load json
-            label_key = f'label-{str(idx).zfill(8)}'.encode()
-            label = txn.get(label_key).decode('utf-8')
-        
-        # image        
-        buf = six.BytesIO()
-        buf.write(imgbuf)
-        buf.seek(0)
-        if self.cfg.input_size == 3:
-            img = np.array(Image.open(buf).convert('RGB'))
-        else:
-            img = np.array(Image.open(buf).convert('L'))
-        
-        img = self.transforms(image=img)['image']
-
-        # label
-        json_dict = json.loads(label)
-        label = self.chart_type2label[json_dict['chart-type']]
-
-        return img, label
-
-
-def get_transforms(cfg, phase):
-    if phase == 'train':
-        aug = cfg.train_aug
-    elif phase == 'valid':
-        aug = cfg.valid_aug
-    elif phase == 'tta':
-        aug = cfg.tta_aug
-
-    augs = [getattr(albumentations, name)(**kwargs) if name != 'RandomAugMix' else RandomAugMix(**kwargs)
-            for name, kwargs in aug.items()]
-    augs.append(ToTensorV2(p=1.))
-    return albumentations.Compose(augs)
-
-
-class MgaModel(nn.Module):
-    def __init__(self, cfg):
-        super().__init__()
-        self.model = timm.create_model(
-            cfg.model_arch, pretrained=cfg.pretrained, in_chans=cfg.input_size, num_classes=cfg.output_size)
-
-    def forward(self, x):
-        return self.model(x)
-
 
 def prepare_dataloader(cfg, lmdb_dir, train_indices, valid_indices):
-    train_ds = MgaLmdbDataset(cfg, lmdb_dir, train_indices,
-                          transforms=get_transforms(cfg, 'train'))
-    valid_ds = MgaLmdbDataset(cfg, lmdb_dir, valid_indices,
-                          transforms=get_transforms(cfg, 'valid'))
-    valid_tta_ds = MgaLmdbDataset(
-        cfg, lmdb_dir, valid_indices, transforms=get_transforms(cfg, 'tta'))
+    train_ds = MgaLmdbDataset(cfg, lmdb_dir, train_indices)
+    valid_ds = MgaLmdbDataset(cfg, lmdb_dir, valid_indices)
+    train_align_collate = AlignCollate(cfg.img_h, cfg.img_w, cfg.padding, is_valid=False)
+    valid_align_collate = AlignCollate(cfg.img_h, cfg.img_w, cfg.padding, is_valid=True)
 
     train_loader = DataLoader(
         train_ds,
         batch_size=cfg.train_bs,
         shuffle=True,
         num_workers=cfg.num_workers,
+        collate_fn=train_align_collate,
         pin_memory=True
     )
 
@@ -164,20 +116,13 @@ def prepare_dataloader(cfg, lmdb_dir, train_indices, valid_indices):
         batch_size=cfg.valid_bs,
         shuffle=False,
         num_workers=cfg.num_workers,
+        collate_fn=valid_align_collate,
         pin_memory=True
     )
-
-    valid_tta_loader = DataLoader(
-        valid_tta_ds,
-        batch_size=cfg.valid_bs,
-        shuffle=False,
-        num_workers=cfg.num_workers,
-        pin_memory=True
-    )
-    return train_loader, valid_loader, valid_tta_loader
+    return train_loader, valid_loader
 
 
-def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, scheduler, scheduler_step_time, scaler):
+def train_one_epoch(cfg, epoch, dataloader, converter, model, loss_fn, device, optimizer, scheduler, scheduler_step_time, scaler):
     def get_lr(optimizer):
         for param_group in optimizer.param_groups:
             return param_group['lr']
@@ -191,7 +136,8 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
     
     for _, (images, labels) in pbar:
         images = images.to(device).float()
-        labels = labels.to(device).long()
+        labels = labels.to(device).long() # ?
+        text, length = converter.encode(labels, batch_max_length)
         bs = len(images)
 
         with autocast(enabled=cfg.use_amp):
@@ -220,7 +166,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
     return losses.avg, accuracy.avg, lr
 
 
-def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
+def valid_one_epoch(cfg, epoch, dataloader, converter, model, loss_fn, device):
     model.eval()
 
     accuracy = AverageMeter()
@@ -228,14 +174,16 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for _, (images, labels) in pbar:
+    for _, (images, texts) in pbar:
         images = images.to(device).float()
         labels = labels.to(device).long()
+        text_encodes, lengths = converter.encode(texts, cfg.batch_max_length)
         bs = len(images)
 
         with torch.no_grad():
-            pred = model(images)
-            loss = loss_fn(pred, labels)
+            pred = model(images, text_encodes) # (bs, n_chars, 512)
+            pred = pred.log_softmax(2).permute(1, 0, 2)
+            loss = loss_fn(pred, text_encodes)
 
         pred_labels = torch.argmax(pred.detach().cpu(), dim=1)
         batch_accuracy = (pred_labels == labels.detach().cpu()).sum().item() / bs
@@ -285,13 +233,11 @@ def main():
         }
 
         # model
-        model = MgaModel(cfg).to(device)
+        model = CRNN(cfg)
 
         # loss
-        if cfg.loss_fn == 'CrossEntropyLoss':
-            loss_fn = torch.nn.CrossEntropyLoss()
-        else:
-            NotImplementedError
+        if cfg.loss_fn == 'CTCLoss':
+            loss_fn = nn.CTCLoss().to(device)
         
         # optimizer
         if cfg.optimizer == 'AdamW':
@@ -302,21 +248,24 @@ def main():
             NotImplementedError
         
         # scheduler
-        if cfg.scheduler == 'CosineAnnealingWarmRestarts':
-            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
-                optimizer, T_0=cfg.T_0, eta_min=cfg.eta_min)
-        elif cfg.scheduler == 'OneCycleLR':
-            scheduler = optim.lr_scheduler.OneCycleLR(
-                optimizer, total_steps=cfg.n_epochs * len(train_loader), max_lr=cfg.lr, pct_start=cfg.pct_start, div_factor=cfg.div_factor, final_div_factor=cfg.final_div_factor)
-        else:
-            NotImplementedError
+        # if cfg.scheduler == 'CosineAnnealingWarmRestarts':
+        #     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        #         optimizer, T_0=cfg.T_0, eta_min=cfg.eta_min)
+        # elif cfg.scheduler == 'OneCycleLR':
+        #     scheduler = optim.lr_scheduler.OneCycleLR(
+        #         optimizer, total_steps=cfg.n_epochs * len(train_loader), max_lr=cfg.lr, pct_start=cfg.pct_start, div_factor=cfg.div_factor, final_div_factor=cfg.final_div_factor)
+        # else:
+        #     NotImplementedError
         
         # grad scaler
         scaler = GradScaler(enabled=cfg.use_amp)
 
+        # CTC label converter
+        converter = CTCLabelConverter(character) # create characterしなきゃ
+
         for epoch in range(1, cfg.n_epochs + 1):
-            train_loss, train_accuracy, lr = train_one_epoch(cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
-            valid_loss, valid_accuracy =  valid_one_epoch(cfg, epoch, valid_loader, model, loss_fn, device)
+            train_loss, train_accuracy, lr = train_one_epoch(cfg, epoch, train_loader, converter, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
+            valid_loss, valid_accuracy =  valid_one_epoch(cfg, epoch, valid_loader, converter, model, loss_fn, device)
             print('-'*80)
             print(f'Epoch {epoch}/{cfg.n_epochs}')
             print(f'    Train Loss: {train_loss:.5f}, Train acc: {train_accuracy*100:.3f}%, lr: {lr:.7f}')

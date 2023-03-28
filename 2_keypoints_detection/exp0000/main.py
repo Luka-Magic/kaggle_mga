@@ -67,22 +67,6 @@ def split_data(cfg, lmdb_dir):
             continue
         if len(joints) == 0:
             continue
-        if np.isnan(joints).any():
-            continue
-        # kp_min = np.amin(joints, 0)
-        # if kp_min[0] < 0 or kp_min[1] < 0:
-        #     continue
-        # h, w, min_x, min_y = json_dict['plot-bb'].values()
-        # max_x, max_y = min_x + w, min_y + h
-        # joint_min_x, joint_min_y = np.amin(joints, 0)
-        # joint_max_x, joint_max_y = np.amax(joints, 0)
-        # if joint_min_x < max(min_x, 0) or \
-        #    joint_min_y < max(min_y, 0) or \
-        #    joint_max_x > max_x or \
-        #    joint_max_y > max_y:
-        #     continue
-        # if joint_min_x < 0 or joint_min_y < 0:
-        #     continue
         indices.append(idx)
 
     print('num-samples: ', len(indices))
@@ -389,7 +373,7 @@ def main():
         scaler = GradScaler(enabled=cfg.use_amp)
 
         for epoch in range(1, cfg.n_epochs + 1):
-            train_loss, train_accuracy, lr = train_one_epoch(cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
+            # train_loss, train_accuracy, lr = train_one_epoch(cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
             valid_loss, valid_accuracy =  valid_one_epoch(cfg, epoch, valid_loader, model, loss_fn, device)
             print('-'*80)
             print(f'Epoch {epoch}/{cfg.n_epochs}')
