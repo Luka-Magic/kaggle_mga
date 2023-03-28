@@ -150,7 +150,7 @@ def train_one_epoch(cfg, epoch, dataloader, converter, model, loss_fn, device, o
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for _, (images, labels) in pbar:
+    for step, (images, labels) in pbar:
         images = images.to(device).float()
         text_encodes, lengths = converter.encode(labels, cfg.batch_max_length)
         text_encodes = text_encodes.to(device).float() # (bs, length)
@@ -175,6 +175,12 @@ def train_one_epoch(cfg, epoch, dataloader, converter, model, loss_fn, device, o
             scheduler.step()
         pbar.set_description(f'[Train epoch {epoch}/{cfg.n_epochs}]')
         pbar.set_postfix(OrderedDict(loss=losses.avg))
+        if cfg.use_wandb:
+            wandb.log({
+                'step': (epoch - 1) * len(pbar) + step,
+                'train_loss': losses.avg,
+                'lr': lr
+            })
     if scheduler_step_time == 'epoch' and scheduler is not None:
         scheduler.step()
     

@@ -1,5 +1,5 @@
 #####   BASIC   ########################################
-use_wandb: false
+use_wandb: true
 wandb_project: kaggle_mga_text_recognition
 dataset_name: data0003
 split_method: KFold
