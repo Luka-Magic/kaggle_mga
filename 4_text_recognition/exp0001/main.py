@@ -74,8 +74,8 @@ def split_data(cfg, lmdb_dir):
         for fold, (train_fold_indices, vaild_fold_indices) \
                 in enumerate(KFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(indices)):
             indices_dict[fold] = {
-                'train': train_fold_indices,
-                'valid': vaild_fold_indices
+                'train': [indices[i] for i in train_fold_indices],
+                'valid': [indices[i] for i in vaild_fold_indices]
             }
     elif  cfg.split_method == 'GroupKFold':
         groups = []
@@ -90,8 +90,8 @@ def split_data(cfg, lmdb_dir):
         for fold, (train_fold_indices, vaild_fold_indices) \
                 in enumerate(GroupKFold(n_splits=cfg.n_folds).split(indices, groups=groups)):
             indices_dict[fold] = {
-                'train': train_fold_indices,
-                'valid': vaild_fold_indices
+                'train': [indices[i] for i in train_fold_indices],
+                'valid': [indices[i] for i in vaild_fold_indices]
             }
     elif cfg.split_method == 'StratifiedKFold':
         labels = []
@@ -107,8 +107,8 @@ def split_data(cfg, lmdb_dir):
         for fold, (train_fold_indices, vaild_fold_indices) \
                 in enumerate(StratifiedKFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(indices, labels)):
             indices_dict[fold] = {
-                'train': train_fold_indices,
-                'valid': vaild_fold_indices
+                'train': [indices[i] for i in train_fold_indices],
+                'valid': [indices[i] for i in vaild_fold_indices]
             }
     return indices_dict
 
