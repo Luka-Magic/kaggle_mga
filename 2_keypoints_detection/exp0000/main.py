@@ -67,9 +67,8 @@ def split_data(cfg, lmdb_dir):
             continue
         if len(joints) == 0:
             continue
-        for x, y in joints:
-            if np.isnan(x) or np.isnan(y):
-                continue
+        if np.isnan(joints).any():
+            continue
         # kp_min = np.amin(joints, 0)
         # if kp_min[0] < 0 or kp_min[1] < 0:
         #     continue
