@@ -38,9 +38,9 @@ class MgaLmdbDataset(Dataset):
         buf.write(imgbuf)
         buf.seek(0)
         if self.cfg.input_channel == 3:
-            img = np.array(Image.open(buf).convert('RGB'))
+            img = Image.open(buf).convert('RGB')
         else:
-            img = np.array(Image.open(buf).convert('L'))
+            img = Image.open(buf).convert('L')
 
         # label
         json_dict = json.loads(label)
