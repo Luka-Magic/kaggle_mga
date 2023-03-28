@@ -163,6 +163,10 @@ class MgaLmdbDataset(Dataset):
         # label
         json_dict = json.loads(label)
         keypoints = [[dic['x'], dic['y']] for dic in json_dict['key_point']]
+        kp_arr = np.array(keypoints)
+        kp_min = np.amin(kp_arr, 0)
+        if kp_min[0] < 0 or kp_min[1] < 0:
+            print(keypoints)
 
         transformed = self.transforms(image=img, keypoints=keypoints)
         img = transformed['image']
