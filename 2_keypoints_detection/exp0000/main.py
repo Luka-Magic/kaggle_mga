@@ -73,14 +73,14 @@ def split_data(cfg, lmdb_dir):
         max_x, max_y = min_x + w, min_y + h
         joint_min_x, joint_min_y = np.amin(joints, 0)
         joint_max_x, joint_max_y = np.amax(joints, 0)
-        if joint_min_x < max(min_x, 0) or \
-           joint_min_y < max(min_y, 0) or \
-           joint_max_x > max_x or \
-           joint_max_y > max_y:
+        # if joint_min_x < max(min_x, 0) or \
+        #    joint_min_y < max(min_y, 0) or \
+        #    joint_max_x > max_x or \
+        #    joint_max_y > max_y:
+        #     continue
+        if joint_min_x < 0 or joint_min_y < 0:
             continue
-        indices.append(idx)
     print('num-samples: ', len(indices))
-# {'height': 145, 'width': 384, 'x0': 92, 'y0': 34},
 
     if cfg.split_method == 'KFold':
         for fold, (train_fold_indices, vaild_fold_indices) \
@@ -116,20 +116,21 @@ class MgaLmdbDataset(Dataset):
         self.env = lmdb.open(str(lmdb_dir), max_readers=32, readonly=True, lock=False, readahead=False, meminit=False)
         self.n_joints = cfg.output_size
         self.sigma = cfg.sigma
-        self.heatmap_size = [cfg.heatmap_h, cfg.heatmap_w]
+        self.img_h, self.img_w = cfg.img_h, cfg.img_w
+        self.heatmap_h, self.heatmap_w = cfg.heatmap_h, cfg.heatmap_w
 
     def _create_heatmap(self, joints):
         '''
             joints: [(x1, y1), (x2, y2), ...]
             heatmap: size: (n_joints, hm_h, hm_w)
         '''
-        heatmap = np.zeros((self.n_joints, self.heatmap_size[1], self.heatmap_size[0]), dtype=np.float32)
+        heatmap = np.zeros((self.n_joints, self.heatmap_h, self.heatmap_w), dtype=np.float32)
         for joint_id in range(len(joints)):
             mu_x = joints[joint_id][0]
             mu_y = joints[joint_id][1]
             
-            x = np.arange(0, self.heatmap_size[0], 1, np.float32)
-            y = np.arange(0, self.heatmap_size[1], 1, np.float32)
+            x = np.arange(0, self.heatmap_w, 1, np.float32)
+            y = np.arange(0, self.heatmap_h, 1, np.float32)
             y = y[:, np.newaxis]
 
             heatmap[joint_id] = np.exp(- ((x - mu_x) ** 2 + (y - mu_y) ** 2) / (2 * self.sigma ** 2))
@@ -165,10 +166,13 @@ class MgaLmdbDataset(Dataset):
         transformed = self.transforms(image=img, keypoints=keypoints)
         img = transformed['image']
         keypoints = transformed['keypoints']
+        keypoints_on_hm = np.array(keypoints) * \
+            np.array([self.heatmap_w, self.heatmap_h]) / np.array([self.img_w, self.img_h])
+
         heatmap_weight = np.zeros(self.n_joints, dtype=np.int32)
         heatmap_weight[:len(keypoints)] = 1
 
-        heatmap = self._create_heatmap(keypoints)
+        heatmap = self._create_heatmap(keypoints_on_hm)
 
         img = torch.from_numpy(img).permute(2, 0, 1)
         heatmap = torch.from_numpy(heatmap)
