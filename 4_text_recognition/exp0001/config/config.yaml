@@ -30,7 +30,7 @@ loss_fn: CTCLoss
 
 ##### Optimizer ########################################
 optimizer: Adam
-lr: 1
+lr: 1e-2
 weight_decay: 1e-6
 
 ##### Scheduler ########################################
@@ -52,8 +52,8 @@ img_h: 32
 img_w: 128
 
 ##### DataLoader ########################################
-train_bs: 64
-valid_bs: 64
+train_bs: 256
+valid_bs: 256
 num_workers: 2
 
 ##### Data Augmentation #################################
