@@ -2,4 +2,3 @@ timm
 hydra-core
 wandb
 lmdb
-torch-info
