@@ -2,6 +2,7 @@ import os
 import numpy as np
 import torch
 import warnings
+from rapidfuzz.distance.Levenshtein import distance as levenshtein
 
 def seed_everything(seed):
     os.environ['PYTHONHASHSEED'] = str(seed)
@@ -77,3 +78,12 @@ class CTCLabelConverter:
 
             texts.append(text)
         return texts
+    
+
+def sigmoid(x):
+    return 2 - 2 / (1 + np.exp(-x))
+
+def normalized_levenshtein_score(y_true, y_pred):
+    total_distance = np.sum([levenshtein(yt, yp) for yt, yp in zip(y_true, y_pred)])
+    length_sum = np.sum([len(yt) for yt in y_true])
+    return sigmoid(total_distance / length_sum)

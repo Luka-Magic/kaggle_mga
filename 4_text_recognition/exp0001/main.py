@@ -39,7 +39,7 @@ import albumentations
 from albumentations.pytorch import ToTensorV2
 
 from model import CRNN
-from utils import seed_everything, AverageMeter, CTCLabelConverter
+from utils import seed_everything, AverageMeter, CTCLabelConverter, normalized_levenshtein_score
 from dataset import MgaLmdbDataset, AlignCollate
 
 
@@ -129,71 +129,75 @@ def train_one_epoch(cfg, epoch, dataloader, converter, model, loss_fn, device, o
     
     model.train()
 
-    accuracy = AverageMeter()
     losses = AverageMeter()
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
     for _, (images, labels) in pbar:
         images = images.to(device).float()
-        labels = labels.to(device).long() # ?
-        text, length = converter.encode(labels, batch_max_length)
+        text_encodes, lengths = converter.encode(labels, cfg.batch_max_length)
+        text_encodes = text_encodes.to(device).float() # (bs, length)
+        lengths = lengths.to(device).long() # (bs)
         bs = len(images)
 
         with autocast(enabled=cfg.use_amp):
-            pred = model(images)
-            loss = loss_fn(pred, labels)
-
+            preds = model(images, text_encodes) # (bs, length, n_chars)
+            preds_size = torch.IntTensor([preds.size(1)] * bs) # (bs, )
+            preds = preds.log_softmax(2).permute(1, 0, 2) # (length, bs, n_chars)
+            loss = loss_fn(preds, text_encodes, preds_size, lengths)
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
 
-        pred_labels = torch.argmax(pred.detach().cpu(), dim=1)
-        batch_accuracy = (pred_labels == labels.detach().cpu()).sum().item() / bs
-        accuracy.update(batch_accuracy, bs)
         losses.update(loss.item(), bs)
         
         if scheduler_step_time == 'step':
             scheduler.step()
         pbar.set_description(f'[Train epoch {epoch}/{cfg.n_epochs}]')
-        pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
+        pbar.set_postfix(OrderedDict(loss=losses.avg))
     if scheduler_step_time == 'epoch':
         scheduler.step()
     
     lr = get_lr(optimizer)
 
-    return losses.avg, accuracy.avg, lr
+    return losses.avg, lr
 
 
 def valid_one_epoch(cfg, epoch, dataloader, converter, model, loss_fn, device):
     model.eval()
 
-    accuracy = AverageMeter()
     losses = AverageMeter()
+    accuracy = AverageMeter()
+    levenshtein = AverageMeter()
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for _, (images, texts) in pbar:
+    for _, (images, labels) in pbar:
         images = images.to(device).float()
-        labels = labels.to(device).long()
-        text_encodes, lengths = converter.encode(texts, cfg.batch_max_length)
         bs = len(images)
+        text_for_pred = torch.LongTensor(bs, cfg.batch_max_length + 1).fill_(0).to(device)
+        text_for_loss, length_for_loss = converter.encode(labels, cfg.batch_max_length)
 
         with torch.no_grad():
-            pred = model(images, text_encodes) # (bs, n_chars, 512)
-            pred = pred.log_softmax(2).permute(1, 0, 2)
-            loss = loss_fn(pred, text_encodes)
+            preds = model(images, text_for_pred) # (bs, length, n_chars)
+            preds_size = torch.IntTensor([preds.size(1)] * bs) # (bs,)
+            loss = loss_fn(preds.log_softmax(2).permute(1, 0, 2), text_for_loss, preds_size, length_for_loss)
 
-        pred_labels = torch.argmax(pred.detach().cpu(), dim=1)
-        batch_accuracy = (pred_labels == labels.detach().cpu()).sum().item() / bs
-        accuracy.update(batch_accuracy, bs)
+        _, preds_index = preds.max(2) # (bs, length)
+        preds_str = converter.decode(preds_index.data, preds_size.data)
+        
+        # evaluate
+        n_correct = sum([gt == pred for gt, pred in zip(labels, preds_str)])
+        nlevs = normalized_levenshtein_score(labels, preds_str)
+        accuracy.update(n_correct / bs, bs)
+        levenshtein.update(nlevs, bs)
         losses.update(loss.item(), bs)
         
         pbar.set_description(f'[Valid epoch {epoch}/{cfg.n_epochs}]')
-        pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
+        pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg, levenshtein=levenshtein.avg))
     
-    return losses.avg, accuracy.avg
+    return losses.avg, accuracy.avg, levenshtein.avg
 
 
 def main():
@@ -264,12 +268,13 @@ def main():
         converter = CTCLabelConverter(character) # create characterしなきゃ
 
         for epoch in range(1, cfg.n_epochs + 1):
-            train_loss, train_accuracy, lr = train_one_epoch(cfg, epoch, train_loader, converter, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
-            valid_loss, valid_accuracy =  valid_one_epoch(cfg, epoch, valid_loader, converter, model, loss_fn, device)
+            train_loss, lr = train_one_epoch(cfg, epoch, train_loader, converter, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
+            valid_loss, valid_accuracy, valid_levenshtein =  valid_one_epoch(cfg, epoch, valid_loader, converter, model, loss_fn, device)
             print('-'*80)
             print(f'Epoch {epoch}/{cfg.n_epochs}')
-            print(f'    Train Loss: {train_loss:.5f}, Train acc: {train_accuracy*100:.3f}%, lr: {lr:.7f}')
-            print(f'    Valid Loss: {valid_loss:.5f}, Valid acc: {valid_accuracy*100:.3f}%')
+            # print(f'    Train Loss: {train_loss:.5f}, Train acc: {train_accuracy*100:.3f}%, lr: {lr:.7f}')
+            print(f'    Train Loss: {train_loss:.5f}, lr: {lr:.7f}')
+            print(f'    Valid Loss: {valid_loss:.5f}, Valid acc: {valid_accuracy*100:.3f}%, Valid Levenshtein: {valid_levenshtein:.5f}')
             print('-'*80)
         
             # save model
@@ -297,10 +302,10 @@ def main():
                 wandb.log({
                     'epoch': epoch,
                     'train_loss': train_loss,
-                    'train_accuracy': train_accuracy,
                     'lr': lr,
                     'valid_loss': valid_loss,
-                    'valid_accuracy': valid_accuracy
+                    'valid_accuracy': valid_accuracy,
+                    'valid_levenshtein': valid_levenshtein
                 })
     wandb.finish()
     del model, train_loader, valid_loader, loss_fn, optimizer, scheduler, best_loss, best_accuracy
