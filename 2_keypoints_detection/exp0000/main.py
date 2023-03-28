@@ -54,7 +54,6 @@ def split_data(cfg, lmdb_dir):
     
     labels = []
     indices = []
-    invalid_ids = []
     # check data
     for idx in tqdm(range(n_samples), total=n_samples):
         with env.begin(write=False) as txn:
@@ -69,22 +68,23 @@ def split_data(cfg, lmdb_dir):
             continue
         if len(joints) < 0:
             continue
-        h, w, min_x, min_y = json_dict['plot-bb'].values()
-        max_x, max_y = min_x + w, min_y + h
-        joint_min_x, joint_min_y = np.amin(joints, 0)
-        joint_max_x, joint_max_y = np.amax(joints, 0)
+        kp_min = np.amin(joints, 0)
+        if kp_min[0] < 0 or kp_min[1] < 0:
+            continue
+        # h, w, min_x, min_y = json_dict['plot-bb'].values()
+        # max_x, max_y = min_x + w, min_y + h
+        # joint_min_x, joint_min_y = np.amin(joints, 0)
+        # joint_max_x, joint_max_y = np.amax(joints, 0)
         # if joint_min_x < max(min_x, 0) or \
         #    joint_min_y < max(min_y, 0) or \
         #    joint_max_x > max_x or \
         #    joint_max_y > max_y:
         #     continue
-        if joint_min_x < 0 or joint_min_y < 0:
-            invalid_ids.append(json_dict['id'])
-            continue
+        # if joint_min_x < 0 or joint_min_y < 0:
+        #     continue
         indices.append(idx - 1)
 
     print('num-samples: ', len(indices))
-    print(invalid_ids)
 
     if cfg.split_method == 'KFold':
         for fold, (train_fold_indices, vaild_fold_indices) \
