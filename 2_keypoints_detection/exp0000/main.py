@@ -50,7 +50,7 @@ def split_data(cfg, lmdb_dir):
 
     env = lmdb.open(str(lmdb_dir), max_readers=32, readonly=True, lock=False, readahead=False, meminit=False)
     with env.begin(write=False) as txn:
-        n_samples = int(txn.get('num-samples'.encode()))
+        n_samples = int(txn.get('num-samples'.encode())) - 1
     
     labels = []
     indices = []
