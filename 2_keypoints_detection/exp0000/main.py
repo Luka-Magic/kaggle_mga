@@ -57,9 +57,8 @@ def split_data(cfg, lmdb_dir):
     # check data
     for idx in tqdm(range(n_samples), total=n_samples):
         with env.begin(write=False) as txn:
-            idx += 1
             # load json
-            label_key = f'label-{str(idx).zfill(8)}'.encode()
+            label_key = f'label-{str(idx+1).zfill(8)}'.encode()
             label = txn.get(label_key).decode('utf-8')
         json_dict = json.loads(label)
         try:
@@ -82,7 +81,7 @@ def split_data(cfg, lmdb_dir):
         #     continue
         # if joint_min_x < 0 or joint_min_y < 0:
         #     continue
-        indices.append(idx - 1)
+        indices.append(idx)
 
     print('num-samples: ', len(indices))
 
@@ -90,15 +89,14 @@ def split_data(cfg, lmdb_dir):
         for fold, (train_fold_indices, vaild_fold_indices) \
                 in enumerate(KFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(indices)):
             indices_dict[fold] = {
-                'train': train_fold_indices,
-                'valid': vaild_fold_indices
+                'train': [indices[i] for i in train_fold_indices],
+                'valid': [indices[i] for i in vaild_fold_indices]
             }
     elif cfg.split_method == 'StratifiedKFold':
         for idx in indices:
-            idx += 1
             with env.begin(write=False) as txn:
                 # load json
-                label_key = f'label-{str(idx).zfill(8)}'.encode()
+                label_key = f'label-{str(idx+1).zfill(8)}'.encode()
                 label = txn.get(label_key).decode('utf-8')
             json_dict = json.loads(label)
             label = cfg.chart_type2label[json_dict['chart-type']]
@@ -106,8 +104,8 @@ def split_data(cfg, lmdb_dir):
         for fold, (train_fold_indices, vaild_fold_indices) \
                 in enumerate(StratifiedKFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(indices, labels)):
             indices_dict[fold] = {
-                'train': train_fold_indices,
-                'valid': vaild_fold_indices
+                'train': [indices[i] for i in train_fold_indices],
+                'valid': [indices[i] for i in vaild_fold_indices]
             }
     return indices_dict
 
@@ -145,14 +143,14 @@ class MgaLmdbDataset(Dataset):
         return len(self.indices)
     
     def __getitem__(self, idx):
-        idx = self.indices[idx] + 1
+        idx = self.indices[idx]
         with self.env.begin(write=False) as txn:
             # load image
-            img_key = f'image-{str(idx).zfill(8)}'.encode()
+            img_key = f'image-{str(idx+1).zfill(8)}'.encode()
             imgbuf = txn.get(img_key)
 
             # load json
-            label_key = f'label-{str(idx).zfill(8)}'.encode()
+            label_key = f'label-{str(idx+1).zfill(8)}'.encode()
             label = txn.get(label_key).decode('utf-8')
         
         # image        
