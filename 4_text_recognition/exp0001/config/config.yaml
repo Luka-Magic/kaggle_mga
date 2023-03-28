@@ -8,7 +8,7 @@ n_folds: 5
 use_fold: [0]
 n_epochs: 30
 save_model: true
-use_amp: true
+use_amp: false
 
 ######   Data   ########################################
 batch_max_length: 25
