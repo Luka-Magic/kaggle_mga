@@ -257,7 +257,7 @@ def main():
         }
 
         # model
-        model = CRNN(cfg)
+        model = CRNN(cfg).to(device)
 
         # loss
         if cfg.loss_fn == 'CTCLoss':

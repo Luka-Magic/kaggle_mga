@@ -15,7 +15,7 @@ batch_max_length: 25
 padding: True
 
 ######   Model   #######################################
-TPS: true
+Transformation: TPS
 FeatureExtraction: ResNet
 SequenceModeling: BiLSTM
 Prediction: CTC
