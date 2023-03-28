@@ -48,12 +48,12 @@ def main():
     ROOT_DIR = Path.cwd().parents[2]
     EXP_NAME = Path.cwd().stem
     LMDB_DIR = ROOT_DIR / 'data' / EXP_NAME / 'lmdb'
-    SAVE_DIR = ROOT_DIR / 'data' / EXP_NAME
+    CHAR_PATH = ROOT_DIR / 'data' / EXP_NAME / 'charactor.txt'
 
     charactors = get_charactor(LMDB_DIR)
 
-    with open(str(SAVE_DIR), 'w') as f:
-        f.read(charactors)
+    with open(str(CHAR_PATH), 'w') as f:
+        f.write(charactors)
 
 if __name__ == '__main__':
     main()

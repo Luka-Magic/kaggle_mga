@@ -14,7 +14,6 @@ def write_cache(env, cache):
         for k, v in cache.items():
             txn.put(k, v)
 
-
 def main():
     ROOT_DIR = Path.cwd().parents[2]
     EXP_NAME = Path.cwd().stem

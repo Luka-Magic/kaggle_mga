@@ -208,6 +208,7 @@ def main():
     ROOT_DIR = Path.cwd().parents[2]
     exp_name = EXP_PATH.name
     LMDB_DIR = ROOT_DIR / 'data' / cfg.dataset_name / 'lmdb'
+    CHAR_PATH = ROOT_DIR / 'data' / exp_name / 'charactor.txt'
     SAVE_DIR = ROOT_DIR / 'outputs' / exp_name
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -219,6 +220,9 @@ def main():
         wandb.login()
 
     indices_dict = split_data(cfg, LMDB_DIR)
+    
+    with open(CHAR_PATH, 'r') as f:
+        charactor = f.read()
 
     for fold in cfg.use_fold:
 
@@ -251,21 +255,21 @@ def main():
         else:
             NotImplementedError
         
-        # scheduler
-        # if cfg.scheduler == 'CosineAnnealingWarmRestarts':
-        #     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
-        #         optimizer, T_0=cfg.T_0, eta_min=cfg.eta_min)
-        # elif cfg.scheduler == 'OneCycleLR':
-        #     scheduler = optim.lr_scheduler.OneCycleLR(
-        #         optimizer, total_steps=cfg.n_epochs * len(train_loader), max_lr=cfg.lr, pct_start=cfg.pct_start, div_factor=cfg.div_factor, final_div_factor=cfg.final_div_factor)
-        # else:
-        #     NotImplementedError
+        scheduler
+        if cfg.scheduler == 'CosineAnnealingWarmRestarts':
+            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+                optimizer, T_0=cfg.T_0, eta_min=cfg.eta_min)
+        elif cfg.scheduler == 'OneCycleLR':
+            scheduler = optim.lr_scheduler.OneCycleLR(
+                optimizer, total_steps=cfg.n_epochs * len(train_loader), max_lr=cfg.lr, pct_start=cfg.pct_start, div_factor=cfg.div_factor, final_div_factor=cfg.final_div_factor)
+        else:
+            NotImplementedError
         
         # grad scaler
         scaler = GradScaler(enabled=cfg.use_amp)
 
         # CTC label converter
-        converter = CTCLabelConverter(character) # create characterしなきゃ
+        converter = CTCLabelConverter(charactor) # create charactorしなきゃ
 
         for epoch in range(1, cfg.n_epochs + 1):
             train_loss, lr = train_one_epoch(cfg, epoch, train_loader, converter, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
