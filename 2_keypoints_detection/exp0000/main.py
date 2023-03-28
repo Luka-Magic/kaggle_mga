@@ -77,9 +77,9 @@ def split_data(cfg, lmdb_dir):
         #    joint_min_y < max(min_y, 0) or \
         #    joint_max_x > max_x or \
         #    joint_max_y > max_y:
+        # #     continue
+        # if joint_min_x < 0 or joint_min_y < 0:
         #     continue
-        if joint_min_x < 0 or joint_min_y < 0:
-            continue
     print('num-samples: ', len(indices))
 
     if cfg.split_method == 'KFold':
