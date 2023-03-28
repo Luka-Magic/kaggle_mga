@@ -40,7 +40,6 @@ from albumentations.pytorch import ToTensorV2
 
 from utils import seed_everything, AverageMeter
 
-
 def split_data(cfg, lmdb_dir):
     indices_dict = {}
 

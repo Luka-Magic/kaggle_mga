@@ -67,6 +67,9 @@ def split_data(cfg, lmdb_dir):
             continue
         if len(joints) == 0:
             continue
+        for x, y in joints:
+            if np.isnan(x) or np.isnan(y):
+                continue
         # kp_min = np.amin(joints, 0)
         # if kp_min[0] < 0 or kp_min[1] < 0:
         #     continue
@@ -248,7 +251,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for _, (images, heatmaps, heatmap_weight) in pbar:
+    for step, (images, heatmaps, heatmap_weight) in pbar:
         images = images.to(device).float()
         heatmaps = heatmaps.to(device).float()
         heatmap_weight = heatmap_weight.to(device).long()
@@ -272,6 +275,13 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
             scheduler.step()
         pbar.set_description(f'[Train epoch {epoch}/{cfg.n_epochs}]')
         pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
+        if cfg.use_wandb:
+            wandb.log({
+                'step': (epoch - 1) * len(pbar) + step,
+                'train_accuracy': accuracy.avg,
+                'train_loss': losses.avg,
+                'lr': lr
+            })
     if scheduler_step_time == 'epoch':
         scheduler.step()
     

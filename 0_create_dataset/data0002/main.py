@@ -4,6 +4,7 @@ from pathlib import Path
 import lmdb
 import re
 import cv2
+import numpy as np
 
 def anns2point_coors(json_dict, img_size):
     tick_id2text = {text_dict['id']: text_dict['text'] for text_dict in json_dict['text']}
@@ -68,6 +69,8 @@ def anns2point_coors(json_dict, img_size):
         # 条件
         if 'x' not in ann_coor or 'y' not in ann_coor:
             continue
+        if np.isnan(ann_coor['x']) or np.isnan(ann_coor['y']):
+            continue
         if ann_coor['x'] < 0 or ann_coor['x'] > img_size[1] \
             or ann_coor['y'] < 0 or ann_coor['y'] > img_size[0]:
             continue
@@ -77,6 +80,7 @@ def anns2point_coors(json_dict, img_size):
 def add_info_json(json_dict, json_path, img_size):
     id_ = json_path.stem
     json_dict['id'] = id_
+    json_dict['image-size'] = {'height': img_size[0], 'width': img_size[1]}
     json_dict['key_point'] = anns2point_coors(json_dict, img_size)
     return json_dict
 
