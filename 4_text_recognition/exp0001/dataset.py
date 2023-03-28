@@ -37,7 +37,7 @@ class MgaLmdbDataset(Dataset):
         buf = six.BytesIO()
         buf.write(imgbuf)
         buf.seek(0)
-        if self.cfg.input_size == 3:
+        if self.cfg.input_channel == 3:
             img = np.array(Image.open(buf).convert('RGB'))
         else:
             img = np.array(Image.open(buf).convert('L'))
