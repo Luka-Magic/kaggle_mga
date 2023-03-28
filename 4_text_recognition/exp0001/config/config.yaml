@@ -1,0 +1,91 @@
+#####   BASIC   ########################################
+use_wandb: false
+wandb_project: kaggle_mga_text_recognition
+seed: 77
+n_iters: 500000
+save_model: true
+use_amp: true
+
+######   Data   ########################################
+train_data_dict:
+  mga_0003
+
+######   Model   #######################################
+TPS: true
+FeatureExtraction: VGG
+SequenceModeling: BiLSTM
+Prediction: CTC
+input_channel: 1
+hidden_channel: 256
+output_channel: 512 # ?
+
+######   Loss   ########################################
+loss_fn: CTCLoss
+
+##### Optimizer ########################################
+optimizer: AdamW
+lr: 1
+weight_decay: 1e-6
+
+##### Scheduler ########################################
+# scheduler: OneCycleLR # OneCycleLR
+# scheduler_step_time: step
+# T_0: ${n_epochs} # CAWR
+# T_mult: 1 # CAWR
+# eta_min: 1e-9 # CAWR
+
+# pct_start: 0.1 # OCLR
+# div_factor: 25. # OCLR
+# final_div_factor: 1000. # OCLR
+
+##### Image Info ########################################
+img_mean: [0.485, 0.456, 0.406]
+img_std: [0.229, 0.224, 0.225]
+img_h: 32
+img_w: 128
+
+##### DataLoader ########################################
+train_bs: 64
+valid_bs: 64
+num_workers: 2
+
+##### Data Augmentation #################################
+train_aug:
+  Resize:
+    height: ${img_size}
+    width: ${img_size}
+    p: 1.0
+  Normalize:
+    mean: ${img_mean}
+    std: ${img_std}
+    max_pixel_value: 255.0
+    p: 1.0
+
+valid_aug:
+  Resize:
+    height: ${img_size}
+    width: ${img_size}
+  Normalize:
+    mean: ${img_mean}
+    std: ${img_std}
+    max_pixel_value: 255.0
+    p: 1.0
+
+tta_aug:
+  Normalize:
+    mean: ${img_mean}
+    std: ${img_std}
+    max_pixel_value: 255.0
+    p: 1.0
+  Resize:
+    height: ${img_size}
+    width: ${img_size}
+  RandomResizedCrop:
+    height: ${img_size}
+    width: ${img_size}
+    scale: [0.3, 1.0]
+    p: 1.0
+  HorizontalFlip: 
+    p: 0.5
+  VerticalFlip: 
+    p: 0.5

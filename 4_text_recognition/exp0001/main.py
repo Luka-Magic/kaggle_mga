@@ -12,7 +12,6 @@ from collections import OrderedDict, Counter
 import lmdb
 import six
 from PIL import Image
-from torchsummary import summary
 
 # hydra
 import hydra
@@ -37,12 +36,9 @@ from torch.cuda.amp import autocast, GradScaler
 # other
 import timm
 import albumentations
-from albumentations import KeypointParams
 from albumentations.pytorch import ToTensorV2
 
-from utils import seed_everything, AverageMeter, calc_accuracy
-from pose_resnet import get_pose_net
-from loss import JointsMSELoss
+from utils import seed_everything, AverageMeter
 
 
 def split_data(cfg, lmdb_dir):
@@ -53,50 +49,21 @@ def split_data(cfg, lmdb_dir):
         n_samples = int(txn.get('num-samples'.encode()))
     
     labels = []
-    indices = []
-    # check data
-    for idx in tqdm(range(n_samples), total=n_samples):
-        with env.begin(write=False) as txn:
-            # load json
-            label_key = f'label-{str(idx+1).zfill(8)}'.encode()
-            label = txn.get(label_key).decode('utf-8')
-        json_dict = json.loads(label)
-        try:
-            joints = np.array([[d['x'], d['y']] for d in json_dict['key_point']])
-        except:
-            continue
-        if len(joints) == 0:
-            continue
-        # kp_min = np.amin(joints, 0)
-        # if kp_min[0] < 0 or kp_min[1] < 0:
-        #     continue
-        # h, w, min_x, min_y = json_dict['plot-bb'].values()
-        # max_x, max_y = min_x + w, min_y + h
-        # joint_min_x, joint_min_y = np.amin(joints, 0)
-        # joint_max_x, joint_max_y = np.amax(joints, 0)
-        # if joint_min_x < max(min_x, 0) or \
-        #    joint_min_y < max(min_y, 0) or \
-        #    joint_max_x > max_x or \
-        #    joint_max_y > max_y:
-        #     continue
-        # if joint_min_x < 0 or joint_min_y < 0:
-        #     continue
-        indices.append(idx)
+    indices = list(range(n_samples))
 
-    print('num-samples: ', len(indices))
-
-    if cfg.split_method == 'KFold':
+    if  cfg.split_method == 'KFold':
         for fold, (train_fold_indices, vaild_fold_indices) \
                 in enumerate(KFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(indices)):
             indices_dict[fold] = {
-                'train': [indices[i] for i in train_fold_indices],
-                'valid': [indices[i] for i in vaild_fold_indices]
+                'train': train_fold_indices,
+                'valid': vaild_fold_indices
             }
     elif cfg.split_method == 'StratifiedKFold':
-        for idx in indices:
+        for idx in range(n_samples):
             with env.begin(write=False) as txn:
+                idx += 1
                 # load json
-                label_key = f'label-{str(idx+1).zfill(8)}'.encode()
+                label_key = f'label-{str(idx).zfill(8)}'.encode()
                 label = txn.get(label_key).decode('utf-8')
             json_dict = json.loads(label)
             label = cfg.chart_type2label[json_dict['chart-type']]
@@ -104,8 +71,8 @@ def split_data(cfg, lmdb_dir):
         for fold, (train_fold_indices, vaild_fold_indices) \
                 in enumerate(StratifiedKFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(indices, labels)):
             indices_dict[fold] = {
-                'train': [indices[i] for i in train_fold_indices],
-                'valid': [indices[i] for i in vaild_fold_indices]
+                'train': train_fold_indices,
+                'valid': vaild_fold_indices
             }
     return indices_dict
 
@@ -117,40 +84,22 @@ class MgaLmdbDataset(Dataset):
         self.transforms = transforms
         self.indices = indices
         self.env = lmdb.open(str(lmdb_dir), max_readers=32, readonly=True, lock=False, readahead=False, meminit=False)
-        self.n_joints = cfg.output_size
-        self.sigma = cfg.sigma
-        self.img_h, self.img_w = cfg.img_h, cfg.img_w
-        self.heatmap_h, self.heatmap_w = cfg.heatmap_h, cfg.heatmap_w
+        self.chart_type2label = cfg.chart_type2label
 
-    def _create_heatmap(self, joints):
-        '''
-            joints: [(x1, y1), (x2, y2), ...]
-            heatmap: size: (n_joints, hm_h, hm_w)
-        '''
-        heatmap = np.zeros((self.n_joints, self.heatmap_h, self.heatmap_w), dtype=np.float32)
-        for joint_id in range(len(joints)):
-            mu_x = joints[joint_id][0]
-            mu_y = joints[joint_id][1]
-            
-            x = np.arange(0, self.heatmap_w, 1, np.float32)
-            y = np.arange(0, self.heatmap_h, 1, np.float32)
-            y = y[:, np.newaxis]
-
-            heatmap[joint_id] = np.exp(- ((x - mu_x) ** 2 + (y - mu_y) ** 2) / (2 * self.sigma ** 2))
-        return heatmap
-        
     def __len__(self):
         return len(self.indices)
     
     def __getitem__(self, idx):
         idx = self.indices[idx]
         with self.env.begin(write=False) as txn:
+            idx += 1
+
             # load image
-            img_key = f'image-{str(idx+1).zfill(8)}'.encode()
+            img_key = f'image-{str(idx).zfill(8)}'.encode()
             imgbuf = txn.get(img_key)
 
             # load json
-            label_key = f'label-{str(idx+1).zfill(8)}'.encode()
+            label_key = f'label-{str(idx).zfill(8)}'.encode()
             label = txn.get(label_key).decode('utf-8')
         
         # image        
@@ -162,31 +111,13 @@ class MgaLmdbDataset(Dataset):
         else:
             img = np.array(Image.open(buf).convert('L'))
         
+        img = self.transforms(image=img)['image']
+
         # label
         json_dict = json.loads(label)
-        keypoints = [[dic['x'], dic['y']] for dic in json_dict['key_point']]
-        kp_arr = np.array(keypoints)
-        kp_min = np.amin(kp_arr, 0)
-        if kp_min[0] < 0 or kp_min[1] < 0:
-            # print(keypoints)
-            print(json_dict['id'])
+        label = self.chart_type2label[json_dict['chart-type']]
 
-        transformed = self.transforms(image=img, keypoints=keypoints)
-        img = transformed['image']
-        keypoints = transformed['keypoints']
-        keypoints_on_hm = np.array(keypoints) * \
-            np.array([self.heatmap_w, self.heatmap_h]) / np.array([self.img_w, self.img_h])
-
-        heatmap_weight = np.zeros(self.n_joints, dtype=np.int32)
-        heatmap_weight[:len(keypoints)] = 1
-
-        heatmap = self._create_heatmap(keypoints_on_hm)
-
-        img = torch.from_numpy(img).permute(2, 0, 1)
-        heatmap = torch.from_numpy(heatmap)
-        heatmap_weight = torch.from_numpy(heatmap_weight)
-
-        return img, heatmap, heatmap_weight
+        return img, label
 
 
 def get_transforms(cfg, phase):
@@ -197,9 +128,20 @@ def get_transforms(cfg, phase):
     elif phase == 'tta':
         aug = cfg.tta_aug
 
-    augs = [getattr(albumentations, name)(**kwargs) for name, kwargs in aug.items()]
-    # augs.append(ToTensorV2(p=1.))
-    return albumentations.Compose(augs, keypoint_params=KeypointParams(format='xy'))
+    augs = [getattr(albumentations, name)(**kwargs) if name != 'RandomAugMix' else RandomAugMix(**kwargs)
+            for name, kwargs in aug.items()]
+    augs.append(ToTensorV2(p=1.))
+    return albumentations.Compose(augs)
+
+
+class MgaModel(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        self.model = timm.create_model(
+            cfg.model_arch, pretrained=cfg.pretrained, in_chans=cfg.input_size, num_classes=cfg.output_size)
+
+    def forward(self, x):
+        return self.model(x)
 
 
 def prepare_dataloader(cfg, lmdb_dir, train_indices, valid_indices):
@@ -248,24 +190,23 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for _, (images, heatmaps, heatmap_weight) in pbar:
+    for _, (images, labels) in pbar:
         images = images.to(device).float()
-        heatmaps = heatmaps.to(device).float()
-        heatmap_weight = heatmap_weight.to(device).long()
+        labels = labels.to(device).long()
         bs = len(images)
 
         with autocast(enabled=cfg.use_amp):
             pred = model(images)
-            loss = loss_fn(pred, heatmaps, heatmap_weight)
+            loss = loss_fn(pred, labels)
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
 
-        _, avg_acc, cnt, pred = calc_accuracy(pred.detach().cpu().numpy(),
-                                              heatmaps.detach().cpu().numpy())
-        accuracy.update(avg_acc, cnt)
+        pred_labels = torch.argmax(pred.detach().cpu(), dim=1)
+        batch_accuracy = (pred_labels == labels.detach().cpu()).sum().item() / bs
+        accuracy.update(batch_accuracy, bs)
         losses.update(loss.item(), bs)
         
         if scheduler_step_time == 'step':
@@ -288,19 +229,18 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for _, (images, heatmaps, heatmap_weight) in pbar:
+    for _, (images, labels) in pbar:
         images = images.to(device).float()
-        heatmaps = heatmaps.to(device).float()
-        heatmap_weight = heatmap_weight.to(device).long()
+        labels = labels.to(device).long()
         bs = len(images)
 
         with torch.no_grad():
             pred = model(images)
-            loss = loss_fn(pred, heatmaps, heatmap_weight)
+            loss = loss_fn(pred, labels)
 
-        _, avg_acc, cnt, pred = calc_accuracy(pred.detach().cpu().numpy(),
-                                              heatmaps.detach().cpu().numpy())
-        accuracy.update(avg_acc, cnt)
+        pred_labels = torch.argmax(pred.detach().cpu(), dim=1)
+        batch_accuracy = (pred_labels == labels.detach().cpu()).sum().item() / bs
+        accuracy.update(batch_accuracy, bs)
         losses.update(loss.item(), bs)
         
         pbar.set_description(f'[Valid epoch {epoch}/{cfg.n_epochs}]')
@@ -346,15 +286,11 @@ def main():
         }
 
         # model
-        if cfg.model_arch == 'hourglassnet':
-            model = get_pose_net(cfg.output_size).to(device)
-        else:
-            NotImplementedError
-        print(summary(model, (3, 300, 500)))
+        model = MgaModel(cfg).to(device)
 
         # loss
-        if cfg.loss_fn == 'JointsMSELoss':
-            loss_fn = JointsMSELoss()
+        if cfg.loss_fn == 'CrossEntropyLoss':
+            loss_fn = torch.nn.CrossEntropyLoss()
         else:
             NotImplementedError
         

@@ -70,7 +70,8 @@ def anns2point_coors(json_dict, img_size):
             continue
         if ann_coor['x'] < 0 or ann_coor['x'] > img_size[1] \
             or ann_coor['y'] < 0 or ann_coor['y'] > img_size[0]:
-            ann_coors.append(ann_coor)
+            continue
+        ann_coors.append(ann_coor)
     return ann_coors
 
 def add_info_json(json_dict, json_path, img_size):
@@ -111,7 +112,7 @@ def main():
         # img
         with open(img_path, 'rb') as f:
             img_bin = f.read()
-        _, h, w = cv2.imread(str(img_path)).shape
+        h, w, _ = cv2.imread(str(img_path)).shape
         img_size = [h, w]
         # json
         json_path = TRAIN_LABEL_DIR / (img_path.stem + '.json')
