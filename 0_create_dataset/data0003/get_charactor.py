@@ -8,7 +8,7 @@ from tqdm import tqdm
 import japanize_matplotlib
 import json
 
-def get_charactor(lmdb_dir):
+def get_character(lmdb_dir):
     env = lmdb.open(str(lmdb_dir), max_readers=32, readonly=True, lock=False, readahead=False, meminit=False)
 
     text_set = set()
@@ -39,21 +39,21 @@ def get_charactor(lmdb_dir):
             
             # one_text_set = set([s for s in json_dict['text']])
             # text_set += one_text_set
-    charactors = list(text_set)
-    charactors.sort()
-    charactors = ''.join(charactors)
-    return charactors
+    characters = list(text_set)
+    characters.sort()
+    characters = ''.join(characters)
+    return characters
 
 def main():
     ROOT_DIR = Path.cwd().parents[2]
     EXP_NAME = Path.cwd().stem
     LMDB_DIR = ROOT_DIR / 'data' / EXP_NAME / 'lmdb'
-    CHAR_PATH = ROOT_DIR / 'data' / EXP_NAME / 'charactor.txt'
+    CHAR_PATH = ROOT_DIR / 'data' / EXP_NAME / 'character.txt'
 
-    charactors = get_charactor(LMDB_DIR)
+    characters = get_character(LMDB_DIR)
 
     with open(str(CHAR_PATH), 'w') as f:
-        f.write(charactors)
+        f.write(characters)
 
 if __name__ == '__main__':
     main()

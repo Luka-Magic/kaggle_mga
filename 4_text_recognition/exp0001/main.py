@@ -224,7 +224,7 @@ def main():
     ROOT_DIR = Path.cwd().parents[2]
     exp_name = EXP_PATH.name
     LMDB_DIR = ROOT_DIR / 'data' / cfg.dataset_name / 'lmdb'
-    CHAR_PATH = ROOT_DIR / 'data' / exp_name / 'charactor.txt'
+    CHAR_PATH = ROOT_DIR / 'data' / cfg.dataset_name / 'character.txt'
     SAVE_DIR = ROOT_DIR / 'outputs' / exp_name
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -238,7 +238,7 @@ def main():
     indices_dict = split_data(cfg, LMDB_DIR)
     
     with open(CHAR_PATH, 'r') as f:
-        charactor = f.read()
+        character = f.read()
 
     for fold in cfg.use_fold:
 
@@ -285,7 +285,7 @@ def main():
         scaler = GradScaler(enabled=cfg.use_amp)
 
         # CTC label converter
-        converter = CTCLabelConverter(charactor) # create charactorしなきゃ
+        converter = CTCLabelConverter(character) # create characterしなきゃ
 
         for epoch in range(1, cfg.n_epochs + 1):
             train_loss, lr = train_one_epoch(cfg, epoch, train_loader, converter, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
