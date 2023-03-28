@@ -63,9 +63,10 @@ def split_data(cfg, lmdb_dir):
             label_key = f'label-{str(idx).zfill(8)}'.encode()
             label = txn.get(label_key).decode('utf-8')
         json_dict = json.loads(label)
-
-        joints = np.array([[d['x'], d['y']] for d in json_dict['key_point']])
-
+        try:
+            joints = np.array([[d['x'], d['y']] for d in json_dict['key_point']])
+        except:
+            continue
         if len(joints) < 0:
             continue
         h, w, min_x, min_y = json_dict['plot-bb'].values()
@@ -76,9 +77,10 @@ def split_data(cfg, lmdb_dir):
         #    joint_min_y < max(min_y, 0) or \
         #    joint_max_x > max_x or \
         #    joint_max_y > max_y:
-        # #     continue
-        # if joint_min_x < 0 or joint_min_y < 0:
         #     continue
+        if joint_min_x < 0 or joint_min_y < 0:
+            continue
+        indices.append(idx)
     print('num-samples: ', len(indices))
 
     if cfg.split_method == 'KFold':
