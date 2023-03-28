@@ -29,7 +29,7 @@ grad_clip: 1
 loss_fn: CTCLoss
 
 ##### Optimizer ########################################
-optimizer: AdamW
+optimizer: Adam
 lr: 1
 weight_decay: 1e-6
 

@@ -156,9 +156,6 @@ def train_one_epoch(cfg, epoch, dataloader, converter, model, loss_fn, device, o
         text_encodes = text_encodes.to(device).float() # (bs, length)
         lengths = lengths.to(device).long() # (bs)
         bs = len(images)
-        print(images.max().item())
-        print(text_encodes.max().item())
-        exit()
 
         with autocast(enabled=cfg.use_amp):
             preds = model(images, text_encodes) # (bs, length, n_chars)
@@ -271,7 +268,9 @@ def main():
             loss_fn = nn.CTCLoss().to(device)
         
         # optimizer
-        if cfg.optimizer == 'AdamW':
+        if cfg.optimizer == 'Adam':
+            optimizer = optim.AdamW(model.parameters(), lr=cfg.lr, betas=(0.9, 0.999))
+        elif cfg.optimizer == 'AdamW':
             optimizer = optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
         elif cfg.optimizer == 'RAdam':
             optimizer = optim.RAdam(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
