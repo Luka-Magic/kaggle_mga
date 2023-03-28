@@ -135,7 +135,7 @@ def main():
             cache = {}
         
         count += 1
-    cache['num-samples'.encode()] = str(count).encode()
+    cache['num-samples'.encode()] = str(count - 1).encode()
     write_cache(env, cache)
 
 if __name__ == '__main__':
