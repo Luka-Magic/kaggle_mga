@@ -79,7 +79,7 @@ def split_data(cfg, lmdb_dir):
         #    joint_max_y > max_y:
         #     continue
         if joint_min_x < 0 or joint_min_y < 0:
-            invalid_ids = [json_dict['id']]
+            invalid_ids.append(json_dict['id'])
             continue
         indices.append(idx - 1)
 
