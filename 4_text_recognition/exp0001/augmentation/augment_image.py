@@ -29,7 +29,8 @@ class ImageAugmentation:
             image = self.rotate_image(image, angle)
             aug_result += f'angle{angle:.1f} - '
         
-        aug_p = random.random()
+        # aug_p = random.random()
+        aug_p = 0.0
         if aug_p > 0.5:
             # 基本的な拡張
             if random.randint(0, 1):

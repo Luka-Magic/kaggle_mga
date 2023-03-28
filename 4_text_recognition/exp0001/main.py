@@ -156,6 +156,9 @@ def train_one_epoch(cfg, epoch, dataloader, converter, model, loss_fn, device, o
         text_encodes = text_encodes.to(device).float() # (bs, length)
         lengths = lengths.to(device).long() # (bs)
         bs = len(images)
+        print(images.max().item())
+        print(text_encodes.max().item())
+        exit()
 
         with autocast(enabled=cfg.use_amp):
             preds = model(images, text_encodes) # (bs, length, n_chars)
