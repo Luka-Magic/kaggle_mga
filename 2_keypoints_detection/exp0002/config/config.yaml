@@ -26,7 +26,7 @@ input_size: 3
 output_size: 1
 
 ######   Loss   ########################################
-loss_fn: JointsMSELoss
+loss_fn: CenterLoss
 gamma: 0. # FOCALLoss
 
 ##### Optimizer ########################################
