@@ -32,13 +32,34 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def calc_accuracy(output, target, hm_type='gaussian', thr=0.5):
+def calc_accuracy(output, target):
     '''
-    target: bs * (n_points, 2)
+    でかい順に並べてどれだけ一致するか
+    target: (bs * h * w)
     '''
-    for i in range(len(target)):
-        n_points = len(target[i])
-        
+    n_bs_corrects = 0
+    n_bs_points = 0
+
+    for i, points in enumerate(target):
+        target_ys, target_xs = np.where(points == 1.)
+        target_set = set((x, y) for x, y in zip(target_xs, target_ys))
+        n_points = len(target_set)
+
+        flat_indices = np.argsort(output.ravel())
+        indices = np.column_stack(np.unravel_index(flat_indices, output.shape))[-n_points, :] # (n_points, 2)
+
+        output_set = set((x, y) for y, x in indices)
+
+        n_bs_corrects += len(target_set & output_set)
+        n_bs_points += n_points
+
+    return n_bs_corrects / n_bs_points, n_bs_points
+
+
+
+
+
+
 
         
 

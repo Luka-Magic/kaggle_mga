@@ -166,9 +166,6 @@ class MgaLmdbDataset(Dataset):
         json_dict = json.loads(label)
         keypoints = [[dic['x'], dic['y']] for dic in json_dict['key_point']]
         kp_arr = np.array(keypoints)
-
-        meta = {'keypoints': kp_arr}
-
         kp_min = np.amin(kp_arr, 0)
         if kp_min[0] < 0 or kp_min[1] < 0:
             # print(keypoints)
@@ -186,7 +183,7 @@ class MgaLmdbDataset(Dataset):
         img = torch.from_numpy(img).permute(2, 0, 1)
         heatmap = torch.from_numpy(heatmap)
 
-        return img, heatmap, meta
+        return img, heatmap
 
 
 def get_transforms(cfg, phase):
@@ -248,9 +245,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
     
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for step, (images, heatmaps, meta) in pbar:
-        if step == 0:
-            print(meta)
+    for step, (images, heatmaps) in pbar:
         images = images.to(device).float()
         heatmaps = heatmaps.to(device).float()
         bs = len(images)
@@ -263,11 +258,9 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
-        # avg_acc, cnt = calc_accuracy(pred.detach().cpu().numpy(), meta['keypoints'])
+        avg_acc, cnt = calc_accuracy(pred.detach().cpu().numpy(), heatmaps.detach().cpu().numpy())
 
-        # _, avg_acc, cnt, pred = calc_accuracy(pred.detach().cpu().numpy(),
-        #                                       heatmaps.detach().cpu().numpy())
-        # accuracy.update(avg_acc, cnt)
+        accuracy.update(avg_acc, cnt)
         losses.update(loss.item(), bs)
         lr =  get_lr(optimizer)
         if scheduler_step_time == 'step':
@@ -277,7 +270,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         if cfg.use_wandb:
             wandb.log({
                 'step': (epoch - 1) * len(pbar) + step,
-                # 'train_accuracy': accuracy.avg,
+                'train_accuracy': accuracy.avg,
                 'train_loss': losses.avg,
                 'lr': lr
             })
@@ -296,7 +289,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for _, (images, heatmaps, meta) in pbar:
+    for _, (images, heatmaps) in pbar:
         images = images.to(device).float()
         heatmaps = heatmaps.to(device).float()
         bs = len(images)
