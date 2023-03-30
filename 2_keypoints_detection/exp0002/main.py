@@ -261,11 +261,11 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
-        avg_acc, cnt = calc_accuracy(pred.detach().cpu().numpy(), meta['keypoints'])
+        # avg_acc, cnt = calc_accuracy(pred.detach().cpu().numpy(), meta['keypoints'])
 
         # _, avg_acc, cnt, pred = calc_accuracy(pred.detach().cpu().numpy(),
         #                                       heatmaps.detach().cpu().numpy())
-        accuracy.update(avg_acc, cnt)
+        # accuracy.update(avg_acc, cnt)
         losses.update(loss.item(), bs)
         lr =  get_lr(optimizer)
         if scheduler_step_time == 'step':
