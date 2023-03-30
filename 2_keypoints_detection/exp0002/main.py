@@ -280,7 +280,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
     
     lr = get_lr(optimizer)
 
-    return losses.avg, lr
+    return losses.avg, accuracy.avg, lr
 
 
 def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
@@ -307,7 +307,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
         pbar.set_description(f'[Valid epoch {epoch}/{cfg.n_epochs}]')
         pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
     
-    return losses.avg
+    return losses.avg, accuracy.avg
 
 
 def main():
@@ -383,8 +383,8 @@ def main():
         scaler = GradScaler(enabled=cfg.use_amp)
 
         for epoch in range(1, cfg.n_epochs + 1):
-            train_loss, lr = train_one_epoch(cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
-            valid_loss = valid_one_epoch(cfg, epoch, valid_loader, model, loss_fn, device)
+            train_loss, train_accuracy, lr = train_one_epoch(cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
+            valid_loss, valid_accuracy = valid_one_epoch(cfg, epoch, valid_loader, model, loss_fn, device)
             print('-'*80)
             print(f'Epoch {epoch}/{cfg.n_epochs}')
             print(f'    Train Loss: {train_loss:.5f}, lr: {lr:.7f}')
@@ -402,11 +402,11 @@ def main():
                 torch.save(save_dict, str(SAVE_DIR / 'best_loss.pth'))
                 if cfg.use_wandb:
                     wandb.run.summary['best_loss'] = best_score['loss']
-            # if valid_accuracy > best_score['accuracy']:
-            #     best_score['accuracy'] = valid_accuracy
-            #     torch.save(save_dict, str(SAVE_DIR / 'best_accuracy.pth'))
-            #     if cfg.use_wandb:
-            #         wandb.run.summary['best_accuracy'] = best_score['accuracy']
+            if valid_accuracy > best_score['accuracy']:
+                best_score['accuracy'] = valid_accuracy
+                torch.save(save_dict, str(SAVE_DIR / 'best_accuracy.pth'))
+                if cfg.use_wandb:
+                    wandb.run.summary['best_accuracy'] = best_score['accuracy']
             del save_dict
             gc.collect()
 
@@ -415,8 +415,10 @@ def main():
                 wandb.log({
                     'epoch': epoch,
                     'train_loss': train_loss,
+                    'train_accuracy': train_accuracy,
                     'lr': lr,
                     'valid_loss': valid_loss,
+                    'valid_accuracy': valid_accuracy
                 })
     wandb.finish()
     del model, train_loader, valid_loader, loss_fn, optimizer, scheduler, best_loss, best_accuracy
