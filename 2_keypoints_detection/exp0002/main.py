@@ -39,7 +39,7 @@ import albumentations
 from albumentations import KeypointParams
 from albumentations.pytorch import ToTensorV2
 
-from utils import seed_everything, AverageMeter, calc_accuracy, get_final_preds
+from utils import seed_everything, AverageMeter, calc_accuracy
 from pose_resnet import get_pose_net
 from loss import CenterLoss
 
@@ -249,6 +249,8 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
     for step, (images, heatmaps, meta) in pbar:
+        if step == 0:
+            print(meta)
         images = images.to(device).float()
         heatmaps = heatmaps.to(device).float()
         bs = len(images)
@@ -294,7 +296,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for _, (images, heatmaps) in pbar:
+    for _, (images, heatmaps, meta) in pbar:
         images = images.to(device).float()
         heatmaps = heatmaps.to(device).float()
         bs = len(images)

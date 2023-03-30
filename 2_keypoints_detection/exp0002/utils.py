@@ -39,5 +39,6 @@ def calc_accuracy(output, target, hm_type='gaussian', thr=0.5):
     for i in range(len(target)):
         n_points = len(target[i])
         
+
         
 
