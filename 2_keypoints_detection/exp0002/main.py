@@ -54,19 +54,20 @@ def split_data(cfg, lmdb_dir):
     labels = []
     indices = []
     # check data
-    for idx in tqdm(range(n_samples), total=n_samples):
-        with env.begin(write=False) as txn:
-            # load json
-            label_key = f'label-{str(idx+1).zfill(8)}'.encode()
-            label = txn.get(label_key).decode('utf-8')
-        json_dict = json.loads(label)
-        try:
-            joints = np.array([[d['x'], d['y']] for d in json_dict['key_point']])
-        except:
-            continue
-        if len(joints) == 0:
-            continue
-        indices.append(idx)
+    # for idx in tqdm(range(n_samples), total=n_samples):
+    #     with env.begin(write=False) as txn:
+    #         # load json
+    #         label_key = f'label-{str(idx+1).zfill(8)}'.encode()
+    #         label = txn.get(label_key).decode('utf-8')
+    #     json_dict = json.loads(label)
+    #     try:
+    #         joints = np.array([[d['x'], d['y']] for d in json_dict['key_point']])
+    #     except:
+    #         continue
+    #     if len(joints) == 0:
+    #         continue
+    #     indices.append(idx)
+    indices = list(range(n_samples))
 
     print('num-samples: ', len(indices))
 
@@ -351,7 +352,10 @@ def main():
         print(summary(model, (3, 300, 500)))
 
         if cfg.pretrained_model_path is not None:
-            model.load_state_dict(torch.load(SAVE_DIR.parent / cfg.pretrained_model_path)['model'], strict=False)
+            for param_name in model.state_dict().keys():
+                if param_name == 'final_layer':
+                    print(f'{param_name} is final layer')
+                model[param_name].load_state_dict(torch.load(SAVE_DIR.parent / cfg.pretrained_model_path)['model'][param_name])
 
         # loss
         if cfg.loss_fn == 'CenterLoss':
