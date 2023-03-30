@@ -255,9 +255,10 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
             loss = loss_fn(pred, heatmaps)
 
         scaler.scale(loss).backward()
-        scaler.step(optimizer)
+        scaler.step(optimizer)  
         scaler.update()
         optimizer.zero_grad()
+        
         avg_acc, cnt = calc_accuracy(pred.detach().cpu().numpy(), heatmaps.detach().cpu().numpy())
 
         accuracy.update(avg_acc, cnt)
@@ -285,6 +286,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
 def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
     model.eval()
 
+    accuracy = AverageMeter()
     losses = AverageMeter()
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
@@ -297,11 +299,14 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
         with torch.no_grad():
             pred = model(images)
             loss = loss_fn(pred, heatmaps)
+        
+        avg_acc, cnt = calc_accuracy(pred.detach().cpu().numpy(), heatmaps.detach().cpu().numpy())
 
         losses.update(loss.item(), bs)
         accuracy = calc_accuracy(pred.detach().cpu().numpy())
+        
         pbar.set_description(f'[Valid epoch {epoch}/{cfg.n_epochs}]')
-        pbar.set_postfix(OrderedDict(loss=losses.avg))
+        pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
     
     return losses.avg
 
