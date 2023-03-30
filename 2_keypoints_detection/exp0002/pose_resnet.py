@@ -94,7 +94,7 @@ class PoseResNet(nn.Module):
         self.deconv_with_bias = False
 
         super(PoseResNet, self).__init__()
-        self.backbone = nn.Sequential(OrderedDict(
+        self.backbone = nn.Sequential(OrderedDict([
             ('conv1', nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
                                 bias=False)),
             ('bn1', nn.BatchNorm2d(64, momentum=BN_MOMENTUM)),
@@ -110,7 +110,7 @@ class PoseResNet(nn.Module):
                 [256, 256, 256],
                 [4, 4, 4],
             )),
-        ))
+        ]))
 
         self.final_layer = nn.Conv2d(
             in_channels=256,
