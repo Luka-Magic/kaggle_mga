@@ -67,8 +67,6 @@ def split_data(cfg, lmdb_dir):
         if len(joints) == 0:
             continue
         indices.append(idx)
-    indices = list(range(n_samples))
-
     print('num-samples: ', len(indices))
 
     if cfg.split_method == 'KFold':
@@ -168,6 +166,9 @@ class MgaLmdbDataset(Dataset):
         json_dict = json.loads(label)
         keypoints = [[dic['x'], dic['y']] for dic in json_dict['key_point']]
         kp_arr = np.array(keypoints)
+
+        meta = {'keypoints': kp_arr}
+
         kp_min = np.amin(kp_arr, 0)
         if kp_min[0] < 0 or kp_min[1] < 0:
             # print(keypoints)
@@ -185,7 +186,7 @@ class MgaLmdbDataset(Dataset):
         img = torch.from_numpy(img).permute(2, 0, 1)
         heatmap = torch.from_numpy(heatmap)
 
-        return img, heatmap
+        return img, heatmap, meta
 
 
 def get_transforms(cfg, phase):
@@ -242,12 +243,12 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
     
     model.train()
 
-    # accuracy = AverageMeter()
+    accuracy = AverageMeter()
     losses = AverageMeter()
     
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for step, (images, heatmaps) in pbar:
+    for step, (images, heatmaps, meta) in pbar:
         images = images.to(device).float()
         heatmaps = heatmaps.to(device).float()
         bs = len(images)
@@ -260,10 +261,11 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
+        avg_acc, cnt = calc_accuracy(pred.detach().cpu().numpy(), meta['keypoints'])
 
         # _, avg_acc, cnt, pred = calc_accuracy(pred.detach().cpu().numpy(),
         #                                       heatmaps.detach().cpu().numpy())
-        # accuracy.update(avg_acc, cnt)
+        accuracy.update(avg_acc, cnt)
         losses.update(loss.item(), bs)
         lr =  get_lr(optimizer)
         if scheduler_step_time == 'step':
@@ -302,7 +304,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
             loss = loss_fn(pred, heatmaps)
 
         losses.update(loss.item(), bs)
-        
+        accuracy = calc_accuracy(pred.detach().cpu().numpy())
         pbar.set_description(f'[Valid epoch {epoch}/{cfg.n_epochs}]')
         pbar.set_postfix(OrderedDict(loss=losses.avg))
     
