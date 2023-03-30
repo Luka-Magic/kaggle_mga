@@ -352,10 +352,7 @@ def main():
         print(summary(model, (3, 300, 500)))
 
         if cfg.pretrained_model_path is not None:
-            for param_name in model.state_dict().keys():
-                if param_name == 'final_layer':
-                    print(f'{param_name} is final layer')
-                model[param_name].load_state_dict(torch.load(SAVE_DIR.parent / cfg.pretrained_model_path)['model'][param_name])
+                model.backbone.load_state_dict(torch.load(SAVE_DIR.parent / cfg.pretrained_model_path)['model'])
 
         # loss
         if cfg.loss_fn == 'CenterLoss':

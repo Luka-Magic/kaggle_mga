@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from collections import OrderedDict
 
 
 BN_MOMENTUM = 0.1
@@ -93,22 +94,23 @@ class PoseResNet(nn.Module):
         self.deconv_with_bias = False
 
         super(PoseResNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-        self.bn1 = nn.BatchNorm2d(64, momentum=BN_MOMENTUM)
-        self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
-
-        # used for deconv layers
-        self.deconv_layers = self._make_deconv_layer(
-            3,
-            [256, 256, 256],
-            [4, 4, 4],
-        )
+        self.backbone = nn.Sequential(OrderedDict(
+            ('conv1', nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
+                                bias=False)),
+            ('bn1', nn.BatchNorm2d(64, momentum=BN_MOMENTUM)),
+            ('relu', nn.ReLU(inplace=True)),
+            ('maxpool', nn.MaxPool2d(kernel_size=3, stride=2, padding=1)),
+            ('layer1', self._make_layer(block, 64, layers[0])),
+            ('layer2', self._make_layer(block, 128, layers[1], stride=2)),
+            ('layer3', self._make_layer(block, 256, layers[2], stride=2)),
+            ('layer4', self._make_layer(block, 512, layers[3], stride=2)),
+            # used for deconv layers
+            ('deconv_layers',self._make_deconv_layer(
+                3,
+                [256, 256, 256],
+                [4, 4, 4],
+            )),
+        ))
 
         self.final_layer = nn.Conv2d(
             in_channels=256,
@@ -176,17 +178,7 @@ class PoseResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
-        x = self.deconv_layers(x)
+        x = self.backbone(x)
         x = self.final_layer(x)
 
         return x
