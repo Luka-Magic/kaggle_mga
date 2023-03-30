@@ -54,19 +54,19 @@ def split_data(cfg, lmdb_dir):
     labels = []
     indices = []
     # check data
-    # for idx in tqdm(range(n_samples), total=n_samples):
-    #     with env.begin(write=False) as txn:
-    #         # load json
-    #         label_key = f'label-{str(idx+1).zfill(8)}'.encode()
-    #         label = txn.get(label_key).decode('utf-8')
-    #     json_dict = json.loads(label)
-    #     try:
-    #         joints = np.array([[d['x'], d['y']] for d in json_dict['key_point']])
-    #     except:
-    #         continue
-    #     if len(joints) == 0:
-    #         continue
-    #     indices.append(idx)
+    for idx in tqdm(range(n_samples), total=n_samples):
+        with env.begin(write=False) as txn:
+            # load json
+            label_key = f'label-{str(idx+1).zfill(8)}'.encode()
+            label = txn.get(label_key).decode('utf-8')
+        json_dict = json.loads(label)
+        try:
+            joints = np.array([[d['x'], d['y']] for d in json_dict['key_point']])
+        except:
+            continue
+        if len(joints) == 0:
+            continue
+        indices.append(idx)
     indices = list(range(n_samples))
 
     print('num-samples: ', len(indices))
@@ -269,7 +269,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         if scheduler_step_time == 'step':
             scheduler.step()
         pbar.set_description(f'[Train epoch {epoch}/{cfg.n_epochs}]')
-        # pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
+        pbar.set_postfix(OrderedDict(loss=losses.avg))
         if cfg.use_wandb:
             wandb.log({
                 'step': (epoch - 1) * len(pbar) + step,
