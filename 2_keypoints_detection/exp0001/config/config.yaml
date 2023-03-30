@@ -54,7 +54,7 @@ img_w: 500
 sigma: 3
 heatmap_h: 80
 heatmap_w: 128
-
+blur_kernel: 11
 
 ##### DataLoader ########################################
 train_bs: 32

@@ -35,14 +35,13 @@ from torchvision.transforms import Compose
 from torch.cuda.amp import autocast, GradScaler
 
 # other
-import timm
 import albumentations
 from albumentations import KeypointParams
 from albumentations.pytorch import ToTensorV2
 
-from utils import seed_everything, AverageMeter, calc_accuracy
+from utils import seed_everything, AverageMeter, calc_accuracy, get_final_preds
 from pose_resnet import get_pose_net
-from loss import JointsMSELoss
+from loss import CenterLoss
 
 
 def split_data(cfg, lmdb_dir):
@@ -103,26 +102,42 @@ class MgaLmdbDataset(Dataset):
         self.transforms = transforms
         self.indices = indices
         self.env = lmdb.open(str(lmdb_dir), max_readers=32, readonly=True, lock=False, readahead=False, meminit=False)
-        self.n_joints = cfg.output_size
+        self.output_size = cfg.output_size
         self.sigma = cfg.sigma
         self.img_h, self.img_w = cfg.img_h, cfg.img_w
         self.heatmap_h, self.heatmap_w = cfg.heatmap_h, cfg.heatmap_w
+    
+    def _overlap_heatmap(self, heatmap, center, sigma):
+        tmp_size = sigma * 6
+        mu_x = int(center[0] + 0.5)
+        mu_y = int(center[1] + 0.5)
+        w, h = heatmap.shape[0], heatmap.shape[1]
+        ul = [int(mu_x - tmp_size), int(mu_y - tmp_size)]
+        br = [int(mu_x + tmp_size + 1), int(mu_y + tmp_size + 1)]
+        if ul[0] >= h or ul[1] >= w or br[0] < 0 or br[1] < 0:
+            return heatmap
+        size = 2 * tmp_size + 1
+        x = np.arange(0, size, 1, np.float32)
+        y = x[:, np.newaxis]
+        x0 = y0 = size // 2
+        g = np.exp(- ((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))
+        g_x = max(0, -ul[0]), min(br[0], h) - ul[0]
+        g_y = max(0, -ul[1]), min(br[1], w) - ul[1]
+        img_x = max(0, ul[0]), min(br[0], h)
+        img_y = max(0, ul[1]), min(br[1], w)
+        heatmap[img_y[0]:img_y[1], img_x[0]:img_x[1]] = np.maximum(
+        heatmap[img_y[0]:img_y[1], img_x[0]:img_x[1]],
+        g[g_y[0]:g_y[1], g_x[0]:g_x[1]])
+        return heatmap
 
     def _create_heatmap(self, joints):
         '''
             joints: [(x1, y1), (x2, y2), ...]
-            heatmap: size: (n_joints, hm_h, hm_w)
+            heatmap: size: (hm_h, hm_w)
         '''
-        heatmap = np.zeros((self.n_joints, self.heatmap_h, self.heatmap_w), dtype=np.float32)
+        heatmap = np.zeros((self.heatmap_h, self.heatmap_w), dtype=np.float32)
         for joint_id in range(len(joints)):
-            mu_x = joints[joint_id][0]
-            mu_y = joints[joint_id][1]
-            
-            x = np.arange(0, self.heatmap_w, 1, np.float32)
-            y = np.arange(0, self.heatmap_h, 1, np.float32)
-            y = y[:, np.newaxis]
-
-            heatmap[joint_id] = np.exp(- ((x - mu_x) ** 2 + (y - mu_y) ** 2) / (2 * self.sigma ** 2))
+            heatmap = self._overlap_heatmap(heatmap, joints[joint_id], self.sigma)
         return heatmap
     
     def __len__(self):
@@ -160,19 +175,16 @@ class MgaLmdbDataset(Dataset):
         transformed = self.transforms(image=img, keypoints=keypoints)
         img = transformed['image']
         keypoints = transformed['keypoints']
+        
         keypoints_on_hm = np.array(keypoints) * \
             np.array([self.heatmap_w, self.heatmap_h]) / np.array([self.img_w, self.img_h])
-
-        heatmap_weight = np.zeros(self.n_joints, dtype=np.int32)
-        heatmap_weight[:len(keypoints)] = 1
 
         heatmap = self._create_heatmap(keypoints_on_hm)
 
         img = torch.from_numpy(img).permute(2, 0, 1)
         heatmap = torch.from_numpy(heatmap)
-        heatmap_weight = torch.from_numpy(heatmap_weight)
 
-        return img, heatmap, heatmap_weight
+        return img, heatmap
 
 
 def get_transforms(cfg, phase):
@@ -229,39 +241,38 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
     
     model.train()
 
-    accuracy = AverageMeter()
+    # accuracy = AverageMeter()
     losses = AverageMeter()
-
+    
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for step, (images, heatmaps, heatmap_weight) in pbar:
+    for step, (images, heatmaps) in pbar:
         images = images.to(device).float()
         heatmaps = heatmaps.to(device).float()
-        heatmap_weight = heatmap_weight.to(device).long()
         bs = len(images)
 
         with autocast(enabled=cfg.use_amp):
             pred = model(images)
-            loss = loss_fn(pred, heatmaps, heatmap_weight)
+            loss = loss_fn(pred, heatmaps)
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
 
-        _, avg_acc, cnt, pred = calc_accuracy(pred.detach().cpu().numpy(),
-                                              heatmaps.detach().cpu().numpy())
-        accuracy.update(avg_acc, cnt)
+        # _, avg_acc, cnt, pred = calc_accuracy(pred.detach().cpu().numpy(),
+        #                                       heatmaps.detach().cpu().numpy())
+        # accuracy.update(avg_acc, cnt)
         losses.update(loss.item(), bs)
         lr =  get_lr(optimizer)
         if scheduler_step_time == 'step':
             scheduler.step()
         pbar.set_description(f'[Train epoch {epoch}/{cfg.n_epochs}]')
-        pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
+        # pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
         if cfg.use_wandb:
             wandb.log({
                 'step': (epoch - 1) * len(pbar) + step,
-                'train_accuracy': accuracy.avg,
+                # 'train_accuracy': accuracy.avg,
                 'train_loss': losses.avg,
                 'lr': lr
             })
@@ -270,36 +281,31 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
     
     lr = get_lr(optimizer)
 
-    return losses.avg, accuracy.avg, lr
+    return losses.avg, lr
 
 
 def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
     model.eval()
 
-    accuracy = AverageMeter()
     losses = AverageMeter()
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
-    for _, (images, heatmaps, heatmap_weight) in pbar:
+    for _, (images, heatmaps) in pbar:
         images = images.to(device).float()
         heatmaps = heatmaps.to(device).float()
-        heatmap_weight = heatmap_weight.to(device).long()
         bs = len(images)
 
         with torch.no_grad():
             pred = model(images)
-            loss = loss_fn(pred, heatmaps, heatmap_weight)
+            loss = loss_fn(pred, heatmaps)
 
-        _, avg_acc, cnt, pred = calc_accuracy(pred.detach().cpu().numpy(),
-                                              heatmaps.detach().cpu().numpy())
-        accuracy.update(avg_acc, cnt)
         losses.update(loss.item(), bs)
         
         pbar.set_description(f'[Valid epoch {epoch}/{cfg.n_epochs}]')
-        pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
+        pbar.set_postfix(OrderedDict(loss=losses.avg))
     
-    return losses.avg, accuracy.avg
+    return losses.avg
 
 
 def main():
@@ -310,7 +316,7 @@ def main():
     ROOT_DIR = Path.cwd().parents[2]
     exp_name = EXP_PATH.name
     LMDB_DIR = ROOT_DIR / 'data' / cfg.dataset_name / 'lmdb'
-    SAVE_DIR = ROOT_DIR / 'outputs' / exp_name
+    SAVE_DIR = ROOT_DIR / 'outputs' / '2_keypoints_detection' / exp_name
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
     seed_everything(cfg.seed)
@@ -334,8 +340,7 @@ def main():
         train_loader, valid_loader, _ = prepare_dataloader(cfg, LMDB_DIR, indices_dict[fold]['train'], indices_dict[fold]['valid'])
 
         best_score = {
-            'loss': float('inf'),
-            'accuracy': 0.0
+            'loss': float('inf')
         }
 
         # model
@@ -345,9 +350,12 @@ def main():
             NotImplementedError
         print(summary(model, (3, 300, 500)))
 
+        if cfg.pretrained_model_path is not None:
+            model.load_state_dict(torch.load(SAVE_DIR.parent / cfg.pretrained_model_path)['model'])
+
         # loss
-        if cfg.loss_fn == 'JointsMSELoss':
-            loss_fn = JointsMSELoss()
+        if cfg.loss_fn == 'CenterLoss':
+            loss_fn = CenterLoss()
         else:
             NotImplementedError
         
@@ -373,19 +381,18 @@ def main():
         scaler = GradScaler(enabled=cfg.use_amp)
 
         for epoch in range(1, cfg.n_epochs + 1):
-            train_loss, train_accuracy, lr = train_one_epoch(cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
-            valid_loss, valid_accuracy =  valid_one_epoch(cfg, epoch, valid_loader, model, loss_fn, device)
+            train_loss, lr = train_one_epoch(cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
+            valid_loss = valid_one_epoch(cfg, epoch, valid_loader, model, loss_fn, device)
             print('-'*80)
             print(f'Epoch {epoch}/{cfg.n_epochs}')
-            print(f'    Train Loss: {train_loss:.5f}, Train acc: {train_accuracy*100:.3f}%, lr: {lr:.7f}')
-            print(f'    Valid Loss: {valid_loss:.5f}, Valid acc: {valid_accuracy*100:.3f}%')
+            print(f'    Train Loss: {train_loss:.5f}, lr: {lr:.7f}')
+            print(f'    Valid Loss: {valid_loss:.5f}')
             print('-'*80)
         
             # save model
             save_dict = {
                 'epoch': epoch,
                 'valid_loss': valid_loss,
-                'valid_accuracy': valid_accuracy,
                 'model': model.state_dict()
             }
             if valid_loss < best_score['loss']:
@@ -393,11 +400,11 @@ def main():
                 torch.save(save_dict, str(SAVE_DIR / 'best_loss.pth'))
                 if cfg.use_wandb:
                     wandb.run.summary['best_loss'] = best_score['loss']
-            if valid_accuracy > best_score['accuracy']:
-                best_score['accuracy'] = valid_accuracy
-                torch.save(save_dict, str(SAVE_DIR / 'best_accuracy.pth'))
-                if cfg.use_wandb:
-                    wandb.run.summary['best_accuracy'] = best_score['accuracy']
+            # if valid_accuracy > best_score['accuracy']:
+            #     best_score['accuracy'] = valid_accuracy
+            #     torch.save(save_dict, str(SAVE_DIR / 'best_accuracy.pth'))
+            #     if cfg.use_wandb:
+            #         wandb.run.summary['best_accuracy'] = best_score['accuracy']
             del save_dict
             gc.collect()
 
@@ -406,10 +413,8 @@ def main():
                 wandb.log({
                     'epoch': epoch,
                     'train_loss': train_loss,
-                    'train_accuracy': train_accuracy,
                     'lr': lr,
                     'valid_loss': valid_loss,
-                    'valid_accuracy': valid_accuracy
                 })
     wandb.finish()
     del model, train_loader, valid_loader, loss_fn, optimizer, scheduler, best_loss, best_accuracy

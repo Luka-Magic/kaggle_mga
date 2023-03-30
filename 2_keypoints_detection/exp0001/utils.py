@@ -56,6 +56,7 @@ def dist_acc(dists, thr=0.5):
     else:
         return -1
 
+
 def get_max_preds(batch_heatmaps):
     '''
     get predictions from score maps
@@ -159,13 +160,13 @@ def gaussian_blur(hm, kernel):
     return hm
 
 
-def get_final_preds(config, hm, center, scale):
+def get_final_preds(cfg, hm):
     coords, maxvals = get_max_preds(hm)
     heatmap_height = hm.shape[2]
     heatmap_width = hm.shape[3]
 
     # post-processing
-    hm = gaussian_blur(hm, config.TEST.BLUR_KERNEL)
+    hm = gaussian_blur(hm, cfg.blur_kernel)
     hm = np.maximum(hm, 1e-10)
     hm = np.log(hm)
     for n in range(coords.shape[0]):
@@ -175,9 +176,9 @@ def get_final_preds(config, hm, center, scale):
     preds = coords.copy()
 
     # Transform back
-    for i in range(coords.shape[0]):
-        preds[i] = transform_preds(
-            coords[i], center[i], scale[i], [heatmap_width, heatmap_height]
-        )
+    # for i in range(coords.shape[0]):
+    #     preds[i] = transform_preds(
+    #         coords[i], center[i], scale[i], [heatmap_width, heatmap_height]
+    #     )
 
     return preds, maxvals

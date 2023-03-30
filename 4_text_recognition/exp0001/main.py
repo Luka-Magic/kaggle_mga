@@ -235,7 +235,7 @@ def main():
     exp_name = EXP_PATH.name
     LMDB_DIR = ROOT_DIR / 'data' / cfg.dataset_name / 'lmdb'
     CHAR_PATH = ROOT_DIR / 'data' / cfg.dataset_name / 'character.txt'
-    SAVE_DIR = ROOT_DIR / 'outputs' / exp_name
+    SAVE_DIR = ROOT_DIR / 'outputs' / '4_text_recognition' / exp_name
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
     seed_everything(cfg.seed)

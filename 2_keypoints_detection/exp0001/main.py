@@ -35,12 +35,11 @@ from torchvision.transforms import Compose
 from torch.cuda.amp import autocast, GradScaler
 
 # other
-import timm
 import albumentations
 from albumentations import KeypointParams
 from albumentations.pytorch import ToTensorV2
 
-from utils import seed_everything, AverageMeter, calc_accuracy
+from utils import seed_everything, AverageMeter, calc_accuracy, get_final_preds
 from pose_resnet import get_pose_net
 from loss import JointsMSELoss
 
@@ -231,7 +230,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
 
     accuracy = AverageMeter()
     losses = AverageMeter()
-
+    
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
     
     for step, (images, heatmaps, heatmap_weight) in pbar:
@@ -310,7 +309,7 @@ def main():
     ROOT_DIR = Path.cwd().parents[2]
     exp_name = EXP_PATH.name
     LMDB_DIR = ROOT_DIR / 'data' / cfg.dataset_name / 'lmdb'
-    SAVE_DIR = ROOT_DIR / 'outputs' / exp_name
+    SAVE_DIR = ROOT_DIR / 'outputs' / '2_keypoints_detection' / exp_name
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
     seed_everything(cfg.seed)

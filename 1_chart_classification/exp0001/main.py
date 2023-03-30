@@ -257,7 +257,7 @@ def main():
     ROOT_DIR = Path.cwd().parents[2]
     exp_name = EXP_PATH.name
     LMDB_DIR = ROOT_DIR / 'data' / cfg.dataset_name / 'lmdb'
-    SAVE_DIR = ROOT_DIR / 'outputs' / exp_name
+    SAVE_DIR = ROOT_DIR / 'outputs' / '1_chart_classification' / exp_name
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
     seed_everything(cfg.seed)
