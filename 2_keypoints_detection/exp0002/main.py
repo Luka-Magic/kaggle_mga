@@ -352,7 +352,7 @@ def main():
         print(summary(model, (3, 300, 500)))
 
         if cfg.pretrained_model_path is not None:
-                model.backbone.load_state_dict(torch.load(SAVE_DIR.parent / cfg.pretrained_model_path)['model'])
+                model.backbone.load_state_dict(torch.load(SAVE_DIR.parent / cfg.pretrained_model_path)['model'], strict=False)
 
         # loss
         if cfg.loss_fn == 'CenterLoss':
