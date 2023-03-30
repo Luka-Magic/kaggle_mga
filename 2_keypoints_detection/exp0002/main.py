@@ -301,9 +301,8 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
             loss = loss_fn(pred, heatmaps)
         
         avg_acc, cnt = calc_accuracy(pred.detach().cpu().numpy(), heatmaps.detach().cpu().numpy())
-
+        accuracy.update(avg_acc, cnt)
         losses.update(loss.item(), bs)
-        accuracy = calc_accuracy(pred.detach().cpu().numpy())
         
         pbar.set_description(f'[Valid epoch {epoch}/{cfg.n_epochs}]')
         pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
