@@ -32,7 +32,7 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def calc_accuracy(output, target):
+def calc_accuracy(outputs, targets):
     '''
     でかい順に並べてどれだけ一致するか
     target: (bs * h * w)
@@ -40,8 +40,8 @@ def calc_accuracy(output, target):
     n_bs_corrects = 0
     n_bs_points = 0
 
-    for i, points in enumerate(target):
-        target_ys, target_xs = np.where(points == 1.)
+    for i, (target, output) in enumerate(zip(targets, outputs)):
+        target_ys, target_xs = np.where(target == 1.)
         target_set = set((x, y) for x, y in zip(target_xs, target_ys))
         n_points = len(target_set)
 
