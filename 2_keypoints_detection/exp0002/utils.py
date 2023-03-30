@@ -46,7 +46,7 @@ def calc_accuracy(output, target):
         n_points = len(target_set)
 
         flat_indices = np.argsort(output.ravel())
-        indices = np.column_stack(np.unravel_index(flat_indices, output.shape))[-n_points, :] # (n_points, 2)
+        indices = np.column_stack(np.unravel_index(flat_indices, output.shape))[-n_points:, :] # (n_points, 2)
 
         output_set = set((x, y) for y, x in indices)
 
