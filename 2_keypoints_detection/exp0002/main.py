@@ -342,7 +342,8 @@ def main():
         train_loader, valid_loader, _ = prepare_dataloader(cfg, LMDB_DIR, indices_dict[fold]['train'], indices_dict[fold]['valid'])
 
         best_score = {
-            'loss': float('inf')
+            'loss': float('inf'),
+            'accuracy': 0.0
         }
 
         # model
