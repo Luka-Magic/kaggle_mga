@@ -556,9 +556,9 @@ def main():
                 )
             if valid_score['valid_score'] > best_score:
                 best_score = valid_score['valid_score']
-                model.save_pretrained(str(SAVE_DIR / 'best_score.pth'))
+                model.save_pretrained(str(SAVE_DIR))
                 processor.save_pretrained(
-                    str(SAVE_DIR / 'best_score.pth'))
+                    str(SAVE_DIR))
                 if cfg.use_wandb:
                     wandb.run.summary['best_score'] = best_score
     wandb.finish()
