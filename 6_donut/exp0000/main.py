@@ -13,7 +13,6 @@ from collections import OrderedDict, Counter
 import lmdb
 import six
 from PIL import Image
-from polyleven import levenshtein
 from typing import List, Dict, Union, Tuple, Any
 
 # hydra
@@ -44,10 +43,6 @@ from transformers import (
     get_scheduler
 )
 from transformers import PreTrainedTokenizerBase, PreTrainedModel
-
-# other
-# import albumentations
-# from albumentations.pytorch import ToTensorV2
 
 from utils import seed_everything, AverageMeter, round_float, is_nan
 from metrics import validation_metrics
@@ -91,7 +86,6 @@ CHART_TYPE2LABEL = {
 }
 
 pad_token_id = None
-unk_token_id = None
 
 # Data split
 
@@ -563,7 +557,7 @@ def main():
             if valid_score['valid_score'] > best_score:
                 best_score = valid_score['valid_score']
                 model.save_pretrained(str(SAVE_DIR / 'best_score.pth'))
-                model.processor.save_pretrained(
+                processor.save_pretrained(
                     str(SAVE_DIR / 'best_score.pth'))
                 if cfg.use_wandb:
                     wandb.run.summary['best_score'] = best_score
