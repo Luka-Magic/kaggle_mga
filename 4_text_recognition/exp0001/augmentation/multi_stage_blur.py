@@ -1,20 +1,22 @@
+import cv2
+from scipy import special
 import random
 import math
 import numpy as np
-np.seterr(divide='ignore', invalid='ignore') # zero除算の警告無視
-from scipy import special
-import cv2
+np.seterr(divide='ignore', invalid='ignore')  # zero除算の警告無視
 """
 Real-ESRGANから引用したランダムblur画像
 """
 
 # general param
-kernel_range = [2 * v + 1 for v in range(3, 10)]  # kernel size ranges from 7 to 21
+# kernel size ranges from 7 to 21
+kernel_range = [2 * v + 1 for v in range(3, 10)]
 # max_kernel
 max_square_kernel = 5
 # 1st stage params
 blur_kernel_size = 21
-kernel_list = ['iso', 'aniso', 'generalized_iso', 'generalized_aniso', 'plateau_iso', 'plateau_aniso']
+kernel_list = ['iso', 'aniso', 'generalized_iso',
+               'generalized_aniso', 'plateau_iso', 'plateau_aniso']
 kernel_prob = [0.45, 0.25, 0.12, 0.03, 0.12, 0.03]
 sinc_prob = 0.1
 blur_sigma = [0.2, 3]
@@ -22,7 +24,8 @@ betag_range = [0.5, 4]
 betap_range = [1, 2]
 # 2nd stage params
 blur_kernel_size2 = 21
-kernel_list2 = ['iso', 'aniso', 'generalized_iso', 'generalized_aniso', 'plateau_iso', 'plateau_aniso']
+kernel_list2 = ['iso', 'aniso', 'generalized_iso',
+                'generalized_aniso', 'plateau_iso', 'plateau_aniso']
 kernel_prob2 = [0.45, 0.25, 0.12, 0.03, 0.12, 0.03]
 sinc_prob2 = 0.1
 blur_sigma2 = [0.2, 1.5]
@@ -30,6 +33,7 @@ betag_range2 = [0.5, 4]
 betap_range2 = [1, 2]
 # Final sinc
 final_sinc_prob = 0.8
+
 
 def get_random_kernels(kernel_list,
                        kernel_prob,
@@ -85,7 +89,7 @@ def get_random_kernels(kernel_list,
             rotation_range,
             betag_range,
             noise_range=noise_range,
-            isotropic=False)        
+            isotropic=False)
     elif kernel_type == 'plateau_iso':
         if kernel_size > max_square_kernel:
             kernel_size = random.choice([3, max_square_kernel])
@@ -123,9 +127,11 @@ def bivariate_generalized_Gaussian(kernel_size, sig_x, sig_y, theta, beta, grid=
     else:
         sigma_matrix = sigma_matrix2(sig_x, sig_y, theta)
     inverse_sigma = np.linalg.inv(sigma_matrix)
-    kernel = np.exp(-0.5 * np.power(np.sum(np.dot(grid, inverse_sigma) * grid, 2), beta))
+    kernel = np.exp(-0.5 * np.power(np.sum(np.dot(grid,
+                    inverse_sigma) * grid, 2), beta))
     kernel = kernel / np.sum(kernel)
     return kernel
+
 
 def random_bivariate_Gaussian(kernel_size,
                               sigma_x_range,
@@ -157,15 +163,18 @@ def random_bivariate_Gaussian(kernel_size,
         sigma_y = sigma_x
         rotation = 0
 
-    kernel = bivariate_Gaussian(kernel_size, sigma_x, sigma_y, rotation, isotropic=isotropic)
+    kernel = bivariate_Gaussian(
+        kernel_size, sigma_x, sigma_y, rotation, isotropic=isotropic)
 
     # add multiplicative noise
     if noise_range is not None:
         assert noise_range[0] < noise_range[1], 'Wrong noise range.'
-        noise = np.random.uniform(noise_range[0], noise_range[1], size=kernel.shape)
+        noise = np.random.uniform(
+            noise_range[0], noise_range[1], size=kernel.shape)
         kernel = kernel * noise
     kernel = kernel / np.sum(kernel)
     return kernel
+
 
 def random_bivariate_generalized_Gaussian(kernel_size,
                                           sigma_x_range,
@@ -205,15 +214,18 @@ def random_bivariate_generalized_Gaussian(kernel_size,
     else:
         beta = np.random.uniform(1, beta_range[1])
 
-    kernel = bivariate_generalized_Gaussian(kernel_size, sigma_x, sigma_y, rotation, beta, isotropic=isotropic)
+    kernel = bivariate_generalized_Gaussian(
+        kernel_size, sigma_x, sigma_y, rotation, beta, isotropic=isotropic)
 
     # add multiplicative noise
     if noise_range is not None:
         assert noise_range[0] < noise_range[1], 'Wrong noise range.'
-        noise = np.random.uniform(noise_range[0], noise_range[1], size=kernel.shape)
+        noise = np.random.uniform(
+            noise_range[0], noise_range[1], size=kernel.shape)
         kernel = kernel * noise
     kernel = kernel / np.sum(kernel)
     return kernel
+
 
 def random_bivariate_plateau(kernel_size,
                              sigma_x_range,
@@ -247,21 +259,23 @@ def random_bivariate_plateau(kernel_size,
         sigma_y = sigma_x
         rotation = 0
 
-    # TODO: this may be not proper
     if np.random.uniform() < 0.5:
         beta = np.random.uniform(beta_range[0], 1)
     else:
         beta = np.random.uniform(1, beta_range[1])
 
-    kernel = bivariate_plateau(kernel_size, sigma_x, sigma_y, rotation, beta, isotropic=isotropic)
+    kernel = bivariate_plateau(
+        kernel_size, sigma_x, sigma_y, rotation, beta, isotropic=isotropic)
     # add multiplicative noise
     if noise_range is not None:
         assert noise_range[0] < noise_range[1], 'Wrong noise range.'
-        noise = np.random.uniform(noise_range[0], noise_range[1], size=kernel.shape)
+        noise = np.random.uniform(
+            noise_range[0], noise_range[1], size=kernel.shape)
         kernel = kernel * noise
     kernel = kernel / np.sum(kernel)
 
     return kernel
+
 
 def bivariate_Gaussian(kernel_size, sig_x, sig_y, theta, grid=None, isotropic=True):
     """Generate a bivariate isotropic or anisotropic Gaussian kernel.
@@ -287,6 +301,7 @@ def bivariate_Gaussian(kernel_size, sig_x, sig_y, theta, grid=None, isotropic=Tr
     kernel = kernel / np.sum(kernel)
     return kernel
 
+
 def bivariate_plateau(kernel_size, sig_x, sig_y, theta, beta, grid=None, isotropic=True):
     """Generate a plateau-like anisotropic kernel.
     1 / (1+x^(beta))
@@ -310,11 +325,14 @@ def bivariate_plateau(kernel_size, sig_x, sig_y, theta, beta, grid=None, isotrop
     else:
         sigma_matrix = sigma_matrix2(sig_x, sig_y, theta)
     inverse_sigma = np.linalg.inv(sigma_matrix)
-    kernel = np.reciprocal(np.power(np.sum(np.dot(grid, inverse_sigma) * grid, 2), beta) + 1)
+    kernel = np.reciprocal(
+        np.power(np.sum(np.dot(grid, inverse_sigma) * grid, 2), beta) + 1)
     kernel = kernel / np.sum(kernel)
     return kernel
 
 # util functions
+
+
 def sigma_matrix2(sig_x, sig_y, theta):
     """Calculate the rotated sigma matrix (two dimensional matrix).
     Args:
@@ -325,8 +343,10 @@ def sigma_matrix2(sig_x, sig_y, theta):
         ndarray: Rotated sigma matrix.
     """
     d_matrix = np.array([[sig_x**2, 0], [0, sig_y**2]])
-    u_matrix = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+    u_matrix = np.array([[np.cos(theta), -np.sin(theta)],
+                        [np.sin(theta), np.cos(theta)]])
     return np.dot(u_matrix, np.dot(d_matrix, u_matrix.T))
+
 
 def pdf2(sigma_matrix, grid):
     """Calculate PDF of the bivariate Gaussian distribution.
@@ -340,6 +360,7 @@ def pdf2(sigma_matrix, grid):
     inverse_sigma = np.linalg.inv(sigma_matrix)
     kernel = np.exp(-0.5 * np.sum(np.dot(grid, inverse_sigma) * grid, 2))
     return kernel
+
 
 def mesh_grid(kernel_size):
     """Generate the mesh grid, centering at zero.
@@ -357,6 +378,8 @@ def mesh_grid(kernel_size):
     return xy, xx, yy
 
 # Sinc filter
+
+
 def circular_lowpass_kernel(cutoff, kernel_size, pad_to=0):
     """2D sinc filter, ref: https://dsp.stackexchange.com/questions/58301/2-d-circularly-symmetric-low-pass-filter
     Args:
@@ -369,12 +392,14 @@ def circular_lowpass_kernel(cutoff, kernel_size, pad_to=0):
         lambda x, y: cutoff * special.j1(cutoff * np.sqrt(
             (x - (kernel_size - 1) / 2)**2 + (y - (kernel_size - 1) / 2)**2)) / (2 * np.pi * np.sqrt(
                 (x - (kernel_size - 1) / 2)**2 + (y - (kernel_size - 1) / 2)**2)), [kernel_size, kernel_size])
-    kernel[(kernel_size - 1) // 2, (kernel_size - 1) // 2] = cutoff**2 / (4 * np.pi)
+    kernel[(kernel_size - 1) // 2, (kernel_size - 1) //
+           2] = cutoff**2 / (4 * np.pi)
     kernel = kernel / np.sum(kernel)
     if pad_to > kernel_size:
         pad_size = (pad_to - kernel_size) // 2
         kernel = np.pad(kernel, ((pad_size, pad_size), (pad_size, pad_size)))
     return kernel
+
 
 def multi_stage_blur(image: np.ndarray) -> np.ndarray:
     # ******1st stage*******
@@ -388,7 +413,7 @@ def multi_stage_blur(image: np.ndarray) -> np.ndarray:
         kernel1 = circular_lowpass_kernel(omega_c, kernel_size, pad_to=False)
     else:
         # Other Blur
-        kernel1 = get_random_kernels(kernel_list, kernel_prob, kernel_size, blur_sigma, 
+        kernel1 = get_random_kernels(kernel_list, kernel_prob, kernel_size, blur_sigma,
                                      blur_sigma, [-math.pi, math.pi], betag_range, betap_range, noise_range=None)
     # pad kernel
     pad_size = (21 - kernel_size) // 2
@@ -404,7 +429,7 @@ def multi_stage_blur(image: np.ndarray) -> np.ndarray:
         kernel2 = circular_lowpass_kernel(omega_c, kernel_size, pad_to=False)
     else:
         kernel2 = get_random_kernels(kernel_list2, kernel_prob2, kernel_size, blur_sigma2,
-                                       blur_sigma2, [-math.pi, math.pi], betag_range2, betap_range2, noise_range=None)
+                                     blur_sigma2, [-math.pi, math.pi], betag_range2, betap_range2, noise_range=None)
     # pad kernel
     pad_size = (21 - kernel_size) // 2
     kernel2 = np.pad(kernel2, ((pad_size, pad_size), (pad_size, pad_size)))
@@ -418,5 +443,6 @@ def multi_stage_blur(image: np.ndarray) -> np.ndarray:
     # 実行
     first_stage_image = cv2.filter2D(image, -1, kernel1)
     second_stage_image = cv2.filter2D(first_stage_image, -1, kernel2)
-    final_sinc_image = cv2.filter2D(second_stage_image,-1, sinc_kernel) if sinc_kernel is not None else second_stage_image
+    final_sinc_image = cv2.filter2D(
+        second_stage_image, -1, sinc_kernel) if sinc_kernel is not None else second_stage_image
     return final_sinc_image

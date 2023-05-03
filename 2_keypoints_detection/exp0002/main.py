@@ -153,7 +153,7 @@ class MgaLmdbDataset(Dataset):
             label_key = f'label-{str(idx+1).zfill(8)}'.encode()
             label = txn.get(label_key).decode('utf-8')
         
-        # image        
+        # image
         buf = six.BytesIO()
         buf.write(imgbuf)
         buf.seek(0)
@@ -325,7 +325,7 @@ def main():
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    if cfg.use_wandb:
+    if cfg.use_wandb: 
         wandb.login()
 
     indices_dict = split_data(cfg, LMDB_DIR)

@@ -98,7 +98,7 @@ tta_aug:
     width: ${img_w}
     scale: [0.3, 1.0]
     p: 1.0
-  HorizontalFlip: 
+  HorizontalFlip:
     p: 0.5
-  VerticalFlip: 
+  VerticalFlip:
     p: 0.5
