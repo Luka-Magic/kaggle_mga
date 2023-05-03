@@ -1,7 +1,7 @@
 #####   BASIC   ######################################
-debug: true
+debug: false
 use_wandb: true
-wandb_project: kaggle_mga_keypoints_detection
+wandb_project: kaggle_mga_image2text
 dataset_name: data0002
 seed: 77
 n_epochs: 5
