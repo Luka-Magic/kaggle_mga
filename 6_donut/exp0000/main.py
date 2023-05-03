@@ -96,7 +96,7 @@ unk_token_id = None
 # Data split
 
 
-def split_data(cfg) -> Dict[int, Dict[str, Any]]:
+def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
     """
     データからextractedだけを抜き取りkfoldでsplitさせる
     その後trainデータにgeneratedのデータを全て合わせる
@@ -107,7 +107,7 @@ def split_data(cfg) -> Dict[int, Dict[str, Any]]:
     """
     indices_dict = {}
 
-    env = lmdb.open(str(cfg.lmdb_path), max_readers=32,
+    env = lmdb.open(str(lmdb_dir), max_readers=32,
                     readonly=True, lock=False, readahead=False, meminit=False)
     with env.begin(write=False) as txn:
         n_samples = int(txn.get('num-samples'.encode()))
@@ -179,13 +179,12 @@ def split_data(cfg) -> Dict[int, Dict[str, Any]]:
 
 # Dataset
 class MgaDataset(Dataset):
-    def __init__(self, cfg, indices, processor, output=True):
+    def __init__(self, cfg, lmdb_dir, indices, processor, output=True):
         self.cfg = cfg
-        self.lmdb_path = cfg.lmdb_path
         self.indices = indices
         self.processor = processor
         self.output = output
-        self.env = lmdb.open(str(cfg.lmdb_path), max_readers=32,
+        self.env = lmdb.open(str(lmdb_dir), max_readers=32,
                              readonly=True, lock=False, readahead=False, meminit=False)
         # TODO: test時の処理が必要か考える
 
@@ -345,9 +344,9 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
 # Dataloader
 
 
-def prepare_dataloader(cfg, processor, train_indices, valid_indices):
-    train_ds = MgaDataset(cfg, train_indices, processor)
-    valid_ds = MgaDataset(cfg, valid_indices, processor)
+def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices):
+    train_ds = MgaDataset(cfg, lmdb_dir, train_indices, processor)
+    valid_ds = MgaDataset(cfg, lmdb_dir, valid_indices, processor)
 
     train_loader = DataLoader(
         train_ds,
@@ -485,7 +484,7 @@ def main():
 
     seed_everything(cfg.seed)
     device = torch.device('cuda') if torch.cuda.is_available() else 'cpu'
-    indices_per_fold = split_data(cfg)
+    indices_per_fold = split_data(cfg, LMDB_DIR)
 
     for fold in cfg.use_fold:
         if cfg.use_wandb:
@@ -529,7 +528,7 @@ def main():
         # data
         train_indices, valid_indices = indices_per_fold[fold]['train'], indices_per_fold[fold]['valid']
         train_loader, valid_loader = prepare_dataloader(
-            cfg, processor, train_indices, valid_indices)
+            cfg, LMDB_DIR, processor, train_indices, valid_indices)
 
         # optimizer
         optimizer = torch.optim.AdamW(

@@ -1,6 +1,6 @@
 #####   BASIC   ######################################
 debug: true
-use_wandb: true
+use_wandb: false
 wandb_project: kaggle_mga_keypoints_detection
 dataset_name: data0002
 seed: 77
