@@ -516,6 +516,7 @@ def main():
             "height": cfg.img_h,
             "width": cfg.img_w,
         }
+        global pad_token_id
         pad_token_id = processor.tokenizer.pad_token_id
         config.pad_token_id = processor.tokenizer.pad_token_id
         config.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids([
