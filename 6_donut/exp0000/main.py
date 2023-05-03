@@ -86,6 +86,7 @@ CHART_TYPE2LABEL = {
 }
 
 pad_token_id = None
+best_score = 0.
 
 # Data split
 
@@ -364,22 +365,32 @@ def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices):
 # Train function
 
 
-def train_one_epoch(
+def train_valid_one_epoch(
     cfg,
+    fold: int,
     epoch: int,
-    dataloader: DataLoader,
+    save_dir: Path,
+    train_loader: DataLoader,
+    valid_loader: DataLoader,
     processor: PreTrainedTokenizerBase,
     model: PreTrainedModel,
     device: torch.device,
     optimizer: torch.optim.Optimizer,
-    scaler: torch.cuda.amp.GradScaler
-) -> float:
+    scaler: torch.cuda.amp.GradScaler,
+    gt_df: pd.DataFrame
+):
+    global best_score
+
     model.train()
 
-    losses = AverageMeter()
-    pbar = tqdm(enumerate(dataloader), total=len(dataloader))
+    # TODO: get_lrを準備する
+    # TODO: schedulerを設定する
 
-    for _, batch in pbar:
+    train_losses = AverageMeter()
+    pbar = tqdm(enumerate(train_loader), total=len(train_loader))
+
+    for step, batch in pbar:
+        step += 1
         pixel_values = batch['pixel_values'].to(device)
         labels = batch["labels"].to(device)
         bs = len(pixel_values)
@@ -395,18 +406,47 @@ def train_one_epoch(
         scaler.update()
         optimizer.zero_grad()
 
-        losses.update(loss.item(), bs)
+        train_losses.update(loss.item(), bs)
 
         pbar.set_description(f'[TRAIN epoch {epoch} / {cfg.n_epochs}]')
-        pbar.set_postfix(OrderedDict(loss=losses.avg))
+        pbar.set_postfix(OrderedDict(loss=train_losses.avg))
         if cfg.use_wandb:
             wandb.log({
+                'step': step + epoch * len(train_loader),
                 'loss': loss.item()
             })
-    return losses.avg
+        if step % (len(train_loader) // cfg.n_valid_per_train) == 0:
+            valid_score = valid_function(cfg, epoch, valid_loader,
+                                         processor, model, device, gt_df)
+            model.train()
+            print("=" * 80)
+            print(
+                f'Fold {fold} | Epoch {epoch} / {cfg.n_epochs} | step {step} / {len(train_loader)}')
+            print(f'    TRAIN: loss: {train_losses.avg:.6f}')
+            for valid_score_name, valid_score_value in valid_score.items():
+                print(
+                    f'            {valid_score_name}: {valid_score_value:.6f}')
+            print("=" * 80)
+
+            if cfg.use_wandb:
+                wandb_log = {
+                    'epoch': epoch,
+                    'train_loss': train_losses.avg,
+                }
+                wandb_log.update(valid_score)
+                wandb.log(
+                    wandb_log
+                )
+            if valid_score['valid_score'] > best_score:
+                best_score = valid_score['valid_score']
+                model.save_pretrained(str(save_dir))
+                processor.save_pretrained(
+                    str(save_dir))
+                if cfg.use_wandb:
+                    wandb.run.summary['best_score'] = best_score
 
 
-def valid_one_epoch(
+def valid_function(
     cfg,
     epoch: int,
     dataloader: DataLoader,
@@ -415,6 +455,7 @@ def valid_one_epoch(
     device: torch.device,
     gt_df: pd.DataFrame
 ) -> Dict[str, float]:
+
     model.eval()
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
@@ -424,7 +465,7 @@ def valid_one_epoch(
 
     for _, batch in pbar:
         pixel_values = batch['pixel_values'].to(device)
-        labels = batch["labels"].to(device)
+        # labels = batch["labels"].to(device)
         bs = len(pixel_values)
         decoder_input_ids = torch.full(
             (bs, 1),
@@ -451,9 +492,9 @@ def valid_one_epoch(
 
         pbar.set_description(f'[VALID epoch {epoch} / {cfg.n_epochs}]')
 
-    metrics = validation_metrics(outputs, ids, gt_df)
+    scores = validation_metrics(outputs, ids, gt_df)
 
-    return metrics
+    return scores
 
 # main
 
@@ -493,8 +534,10 @@ def main():
         pretrained_path = cfg.pretrained_model_dir if cfg.restart \
             else cfg.pretrained_model_from_net_path
 
-        # best score
+        # init value
         best_score = 0.
+        n_steps = 0
+        # TODO: save dirにrestartで取ってこれるようにこの辺の値をjsonで保存するように実装
 
         # model config
         config = VisionEncoderDecoderConfig.from_pretrained(
@@ -534,34 +577,8 @@ def main():
         scaler = GradScaler(enabled=cfg.use_amp)
 
         for epoch in range(1, cfg.n_epochs + 1):
-            train_loss = train_one_epoch(
-                cfg, epoch, train_loader, processor, model, device, optimizer, scaler)
-            valid_score = valid_one_epoch(
-                cfg, epoch, valid_loader, processor, model, device, indices_per_fold[fold]['gt_df'])
-            print("=" * 80)
-            print(f'Fold {fold} | Epoch {epoch} / {cfg.n_epochs}')
-            print(f'    TRAIN: loss: {train_loss:.6f}')
-            for valid_score_name, valid_score_value in valid_score.items():
-                print(
-                    f'            {valid_score_name}: {valid_score_value:.6f}')
-            print("=" * 80)
-
-            if cfg.use_wandb:
-                wandb_log = {
-                    'epoch': epoch,
-                    'train_loss': train_loss,
-                }
-                wandb_log.update(valid_score)
-                wandb.log(
-                    wandb_log
-                )
-            if valid_score['valid_score'] > best_score:
-                best_score = valid_score['valid_score']
-                model.save_pretrained(str(SAVE_DIR))
-                processor.save_pretrained(
-                    str(SAVE_DIR))
-                if cfg.use_wandb:
-                    wandb.run.summary['best_score'] = best_score
+            train_valid_one_epoch(
+                cfg, fold, epoch, SAVE_DIR, train_loader, valid_loader, processor, model, device, optimizer, scaler, indices_per_fold[fold]['gt_df'])
     wandb.finish()
     del model, processor, config, train_loader, valid_loader, train_indices, valid_indices, optimizer, scaler
 
