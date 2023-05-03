@@ -327,10 +327,13 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
     if max_length % 8 != 0:
         max_length = (max_length // 8 + 1) * 8
 
+    print(len(samples))
+    print(pad_token_id)
     input_ids = [
         x["input_ids"] + [pad_token_id] * (max_length - len(x["input_ids"]))
         for x in samples
     ]
+    print(input_ids)
 
     labels = torch.tensor(input_ids)
     # TODO: 何の意味があるか調べる
