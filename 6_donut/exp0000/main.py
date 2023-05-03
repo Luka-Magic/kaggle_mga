@@ -465,8 +465,9 @@ def main():
 
     ROOT_DIR = Path.cwd().parents[2]
     exp_name = EXP_PATH.name
+    project_name = Path.cwd().parent.stem
     LMDB_DIR = ROOT_DIR / 'data' / cfg.dataset_name / 'lmdb'
-    SAVE_DIR = ROOT_DIR / 'outputs' / '2_keypoints_detection' / exp_name
+    SAVE_DIR = ROOT_DIR / 'outputs' / project_name / exp_name
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
     seed_everything(cfg.seed)
