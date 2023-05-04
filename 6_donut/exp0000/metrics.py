@@ -48,6 +48,8 @@ def sigmoid(x: float) -> float:
 
     Returns:
         float: The result of the sigmoid function.
+        x -> 0: sig(x) -> 1
+        x -> +∞: sig(x) -> 0
     """
     return 2 - 2 / (1 + np.exp(-x))
 
@@ -69,7 +71,7 @@ def normalized_rmse(y_true: List[float], y_pred: List[float]) -> float:
     # https://www.kaggle.com/competitions/benetech-making-graphs-accessible/discussion/396947
     if denominator == 0:
         if numerator == 0:
-            return 1.0
+            return 1.0  # 正解が1つ & 正解したら
         return 0.0
 
     return sigmoid(numerator / denominator)
@@ -143,9 +145,15 @@ def benetech_score(ground_truth: pd.DataFrame, predictions: pd.DataFrame) -> flo
     scores = []
     for (gt_series, gt_type), (pred_series, pred_type) in pairs:
         if gt_type != pred_type:  # Check chart_type condition
-            scores.append(0.0)
+            score = 0.0
         else:  # Score with RMSE or Levenshtein as appropriate
-            scores.append(score_series(gt_series, pred_series))
+            score = score_series(gt_series, pred_series)
+            if np.isnan(score):
+                print('score is NaN!!!')
+                print(gt_type)
+                print(pred_type)
+                print(gt_series)
+                print(pred_series)
 
     ground_truth["score"] = scores
 
@@ -198,8 +206,13 @@ def validation_metrics(val_outputs: List[str], val_ids: List[str], gt_df: pd.Dat
 
     Args:
         val_outputs (List[str]): A list of validation outputs.
+            str: <|PROMPT|><line><x_start> ... </s>
         val_ids (List[str]): A list of validation ids.
+            str: index(0 ~ length_of_dataset)
         gt_df (pd.DataFrame): The ground truth dataframe.
+            index: id_x or id_y
+            data_series: v1;v2;...vn
+            chart_type: select from 5 chart types.
 
     Returns:
         Dict[str, float]: A dictionary containing the validation scores.
@@ -212,6 +225,8 @@ def validation_metrics(val_outputs: List[str], val_ids: List[str], gt_df: pd.Dat
             pred_triplets.append(("line", [], []))
         else:
             pred_triplets.append(string2triplet(example_output))
+            # <?_start> ~ <?_end>までをx, yそれぞれ切り取り;でsplitしてlist化, 短い方の長さに揃える。
+            # Tuple(chart_type, x, y)
 
     pred_df = pd.DataFrame(
         index=[f"{id_}_x" for id_ in val_ids] +
