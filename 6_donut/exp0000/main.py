@@ -44,8 +44,9 @@ from transformers import (
 )
 from transformers import PreTrainedTokenizerBase, PreTrainedModel
 
-from utils import seed_everything, AverageMeter, round_float, is_nan
+from utils import seed_everything, AverageMeter, round_float, is_nan, get_lr
 from metrics import validation_metrics
+
 
 PROMPT_TOKEN = "<|PROMPT|>"
 X_START = "<x_start>"
@@ -376,6 +377,8 @@ def train_valid_one_epoch(
     model: PreTrainedModel,
     device: torch.device,
     optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler,
+    scheduler_step_time: str,
     scaler: torch.cuda.amp.GradScaler,
     gt_df: pd.DataFrame
 ):
@@ -384,11 +387,11 @@ def train_valid_one_epoch(
     model.train()
 
     # TODO: get_lrを準備する
-    # TODO: schedulerを設定する
 
     train_losses = AverageMeter()
     pbar = tqdm(enumerate(train_loader), total=len(train_loader))
 
+    # train & valid
     for step, batch in pbar:
         step += 1
         pixel_values = batch['pixel_values'].to(device)
@@ -407,15 +410,20 @@ def train_valid_one_epoch(
         optimizer.zero_grad()
 
         train_losses.update(loss.item(), bs)
-
+        lr = get_lr(optimizer)
+        if scheduler_step_time == 'step':
+            scheduler.step()
         pbar.set_description(f'[TRAIN epoch {epoch} / {cfg.n_epochs}]')
         pbar.set_postfix(OrderedDict(loss=train_losses.avg))
         if cfg.use_wandb:
             wandb.log({
                 'step': step + epoch * len(train_loader),
-                'loss': loss.item()
+                'loss': loss.item(),
+                'lr': lr
             })
+
         if step % (len(train_loader) // cfg.n_valid_per_train) == 0:
+            # valid
             valid_score = valid_function(cfg, epoch, valid_loader,
                                          processor, model, device, gt_df)
             model.train()
@@ -428,6 +436,7 @@ def train_valid_one_epoch(
                     f'            {valid_score_name}: {valid_score_value:.6f}')
             print("=" * 80)
 
+            # log
             if cfg.use_wandb:
                 wandb_log = {
                     'epoch': epoch,
@@ -437,6 +446,7 @@ def train_valid_one_epoch(
                 wandb.log(
                     wandb_log
                 )
+            # save model
             if valid_score['valid_score'] > best_score:
                 best_score = valid_score['valid_score']
                 model.save_pretrained(str(save_dir))
@@ -444,6 +454,8 @@ def train_valid_one_epoch(
                     str(save_dir))
                 if cfg.use_wandb:
                     wandb.run.summary['best_score'] = best_score
+        if scheduler_step_time == 'epoch':
+            scheduler.step()
 
 
 def valid_function(
@@ -463,7 +475,7 @@ def valid_function(
     outputs = []
     ids = []
 
-    for _, batch in pbar:
+    for step, batch in pbar:
         pixel_values = batch['pixel_values'].to(device)
         # labels = batch["labels"].to(device)
         bs = len(pixel_values)
@@ -486,6 +498,9 @@ def valid_function(
             bad_words_ids=[[processor.tokenizer.unk_token_id]],
             return_dict_in_generate=True
         )
+        if step == 0:
+            print(output.sequences)
+            print(processor.tokenizer.batch_decode(output.sequences))
 
         outputs.extend(processor.tokenizer.batch_decode(output.sequences))
         ids.extend(batch['id'])
@@ -576,9 +591,19 @@ def main():
         # scaler
         scaler = GradScaler(enabled=cfg.use_amp)
 
+        # scheduelr
+        if cfg.scheduler == 'CosineAnnealingWarmRestarts':
+            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+                optimizer, T_0=cfg.T_0, eta_min=cfg.eta_min)
+        elif cfg.scheduler == 'OneCycleLR':
+            scheduler = optim.lr_scheduler.OneCycleLR(
+                optimizer, total_steps=cfg.n_epochs * len(train_loader), max_lr=cfg.lr, pct_start=cfg.pct_start, div_factor=cfg.div_factor, final_div_factor=cfg.final_div_factor)
+        else:
+            scheduler = None
+
         for epoch in range(1, cfg.n_epochs + 1):
             train_valid_one_epoch(
-                cfg, fold, epoch, SAVE_DIR, train_loader, valid_loader, processor, model, device, optimizer, scaler, indices_per_fold[fold]['gt_df'])
+                cfg, fold, epoch, SAVE_DIR, train_loader, valid_loader, processor, model, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, indices_per_fold[fold]['gt_df'])
     wandb.finish()
     del model, processor, config, train_loader, valid_loader, train_indices, valid_indices, optimizer, scaler
 

@@ -70,3 +70,8 @@ def is_nan(value: Union[int, float, str]) -> bool:
         bool: True if the value is NaN, False otherwise
     """
     return isinstance(value, float) and str(value) == "nan"
+
+
+def get_lr(optimizer):
+    for param_group in optimizer.param_groups:
+        return param_group['lr']
