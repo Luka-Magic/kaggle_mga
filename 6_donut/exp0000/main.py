@@ -416,7 +416,7 @@ def train_valid_one_epoch(
         if scheduler_step_time == 'step':
             scheduler.step()
         pbar.set_description(
-            f'[TRAIN epoch {epoch}/{cfg.n_epochs}] ({valid_count_per_epoch}/{cfg.n_valid_per_train})')
+            f'[TRAIN epoch {epoch}/{cfg.n_epochs}] ({valid_count_per_epoch}/{cfg.n_valid_per_epoch})')
         pbar.set_postfix(OrderedDict(loss=train_losses.avg))
         if cfg.use_wandb:
             wandb.log({
