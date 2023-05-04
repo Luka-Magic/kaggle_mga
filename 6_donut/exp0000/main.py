@@ -290,6 +290,7 @@ class MgaDataset(Dataset):
             gt_string,
             add_special_tokens=False,
             max_length=self.cfg.max_length,
+            # batch内でmaxにpaddingするという意味。今回は1つの入力なのでpaddingされないはず。(max_lengthが関係ない)
             padding=True,
             truncation=True
         ).input_ids
@@ -363,9 +364,8 @@ def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices):
     )
     return train_loader, valid_loader
 
+
 # Train function
-
-
 def train_valid_one_epoch(
     cfg,
     fold: int,
@@ -422,7 +422,7 @@ def train_valid_one_epoch(
                 'lr': lr
             })
 
-        if step % (len(train_loader) // cfg.n_valid_per_train) == 0 or step == 1:
+        if step % (len(train_loader) // cfg.n_valid_per_train) == 0:
             # valid
             valid_score = valid_function(cfg, epoch, valid_loader,
                                          processor, model, device, gt_df)
@@ -477,7 +477,6 @@ def valid_function(
 
     for step, batch in pbar:
         pixel_values = batch['pixel_values'].to(device)
-        # labels = batch["labels"].to(device)
         bs = len(pixel_values)
         decoder_input_ids = torch.full(
             (bs, 1),
@@ -574,11 +573,9 @@ def main():
 
         # model
         model = VisionEncoderDecoderModel.from_pretrained(
-            pretrained_path).to(device)
+            pretrained_path, config=config).to(device)
         model.decoder.resize_token_embeddings(len(processor.tokenizer))
-        model.config.pad_token_id = pad_token_id
-        model.config.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids([
-                                                                                        PROMPT_TOKEN])[0]
+
         # data
         train_indices, valid_indices = indices_per_fold[fold]['train'], indices_per_fold[fold]['valid']
         train_loader, valid_loader = prepare_dataloader(
