@@ -155,18 +155,21 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
                                  for i in train_fold_indices] + generated_indicies
                 valid_indices = [extracted_indices[i]
                                  for i in valid_fold_indices]
+            gt_df = pd.DataFrame(
+                index=[f"{id_}_x" for id_ in valid_indices] +
+                [f"{id_}_y" for id_ in valid_indices],
+                data={
+                    "data_series": extracted_fold_info['x'] + extracted_fold_info['y'],
+                    "chart_type": extracted_fold_info['chart_type'] * 2,
+                })
             indices_dict[fold] = {
                 'train': train_indices,
                 'valid': valid_indices,
-                'gt_df': pd.DataFrame(
-                    index=[f"{id_}_x" for id_ in valid_indices] +
-                        [f"{id_}_y" for id_ in valid_indices],
-                    data={
-                        "data_series": extracted_fold_info['x'] + extracted_fold_info['y'],
-                        "chart_type": extracted_fold_info['chart_type'] * 2,
-                    },
-                )
+                'gt_df': gt_df
             }
+            print(f'fold {fold}:')
+            for chart_type, count in gt_df.groupby("chart_type").count()['data_series'].items():
+                print(f'{chart_type}: {count}')
     else:
         NotImplementedError
 
@@ -416,7 +419,7 @@ def train_valid_one_epoch(
         if scheduler_step_time == 'step':
             scheduler.step()
         pbar.set_description(
-            f'[TRAIN epoch {epoch}/{cfg.n_epochs}] ({valid_count_per_epoch}/{cfg.n_valid_per_epoch})')
+            f'[TRAIN epoch {epoch}/{cfg.n_epochs} ({valid_count_per_epoch}/{cfg.n_valid_per_epoch})]')
         pbar.set_postfix(OrderedDict(loss=train_losses.avg))
         if cfg.use_wandb:
             wandb.log({
@@ -430,9 +433,10 @@ def train_valid_one_epoch(
             valid_score = valid_function(cfg, epoch, valid_loader,
                                          processor, model, device, gt_df)
             model.train()
+            valid_count_per_epoch += 1
             print("=" * 80)
             print(
-                f'Fold {fold} | Epoch {epoch} / {cfg.n_epochs} | step {step} / {len(train_loader)}')
+                f'Fold {fold} | Epoch {epoch}/{cfg.n_epochs} ({valid_count_per_epoch}/{cfg.n_valid_per_epoch})')
             print(f'    TRAIN: loss: {train_losses.avg:.6f}')
             for valid_score_name, valid_score_value in valid_score.items():
                 print(
