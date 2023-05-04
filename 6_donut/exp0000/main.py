@@ -422,7 +422,7 @@ def train_valid_one_epoch(
                 'lr': lr
             })
 
-        if step % (len(train_loader) // cfg.n_valid_per_train) == 0:
+        if step % (len(train_loader) // cfg.n_valid_per_train) == 0 or step == 1:
             # valid
             valid_score = valid_function(cfg, epoch, valid_loader,
                                          processor, model, device, gt_df)
