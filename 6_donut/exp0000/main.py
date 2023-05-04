@@ -391,6 +391,8 @@ def train_valid_one_epoch(
     train_losses = AverageMeter()
     pbar = tqdm(enumerate(train_loader), total=len(train_loader))
 
+    valid_count_per_epoch = 0
+
     # train & valid
     for step, batch in pbar:
         step += 1
@@ -413,7 +415,8 @@ def train_valid_one_epoch(
         lr = get_lr(optimizer)
         if scheduler_step_time == 'step':
             scheduler.step()
-        pbar.set_description(f'[TRAIN epoch {epoch} / {cfg.n_epochs}]')
+        pbar.set_description(
+            f'[TRAIN epoch {epoch}/{cfg.n_epochs}] ({valid_count_per_epoch}/{cfg.n_valid_per_train})')
         pbar.set_postfix(OrderedDict(loss=train_losses.avg))
         if cfg.use_wandb:
             wandb.log({
@@ -422,7 +425,7 @@ def train_valid_one_epoch(
                 'lr': lr
             })
 
-        if step % (len(train_loader) // cfg.n_valid_per_train) == 0:
+        if step % (len(train_loader) // cfg.n_valid_per_epoch) == 0:
             # valid
             valid_score = valid_function(cfg, epoch, valid_loader,
                                          processor, model, device, gt_df)
