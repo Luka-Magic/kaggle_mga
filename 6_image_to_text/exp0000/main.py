@@ -167,9 +167,6 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
                 'valid': valid_indices,
                 'gt_df': gt_df
             }
-            print(f'fold {fold}:')
-            for chart_type, count in gt_df.groupby("chart_type").count()['data_series'].items():
-                print(f'{chart_type}: {count}')
     else:
         NotImplementedError
 

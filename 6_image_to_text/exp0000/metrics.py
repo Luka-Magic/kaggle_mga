@@ -148,13 +148,13 @@ def benetech_score(ground_truth: pd.DataFrame, predictions: pd.DataFrame) -> flo
             score = 0.0
         else:  # Score with RMSE or Levenshtein as appropriate
             score = score_series(gt_series, pred_series)
-            if np.isnan(score):
-                print('score is NaN!!!')
-                print(gt_type)
-                print(pred_type)
-                print(gt_series)
-                print(pred_series)
-            scores.append(score)
+        if np.isnan(score):
+            print('score is NaN!!!')
+            print(gt_type)
+            print(pred_type)
+            print(gt_series)
+            print(pred_series)
+        scores.append(score)
 
     ground_truth["score"] = scores
 
