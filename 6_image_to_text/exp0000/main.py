@@ -477,12 +477,10 @@ def valid_function(
 
     model.eval()
 
-    pbar = tqdm(enumerate(dataloader), total=len(dataloader))
-
     outputs = []
     ids = []
 
-    for step, batch in pbar:
+    for step, batch in enumerate(dataloader):
         pixel_values = batch['pixel_values'].to(device)
         bs = len(pixel_values)
         decoder_input_ids = torch.full(
@@ -510,8 +508,6 @@ def valid_function(
 
         outputs.extend(processor.tokenizer.batch_decode(output.sequences))
         ids.extend(batch['id'])
-
-        pbar.set_description(f'[VALID epoch {epoch} / {cfg.n_epochs}]')
 
     scores = validation_metrics(outputs, ids, gt_df)
 
@@ -555,10 +551,7 @@ def main():
         pretrained_path = cfg.pretrained_model_dir if cfg.restart \
             else cfg.pretrained_model_from_net_path
 
-        # init value
-        best_score = 0.
-        n_steps = 0
-        # TODO: save dirにrestartで取ってこれるようにこの辺の値をjsonで保存するように実装
+        # TODO: save dirにrestartで取ってこれるようにepochやbest scoreをjsonで保存するように実装
 
         # model config
         config = VisionEncoderDecoderConfig.from_pretrained(

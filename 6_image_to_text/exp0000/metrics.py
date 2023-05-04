@@ -154,6 +154,7 @@ def benetech_score(ground_truth: pd.DataFrame, predictions: pd.DataFrame) -> flo
                 print(pred_type)
                 print(gt_series)
                 print(pred_series)
+            scores.append(score)
 
     ground_truth["score"] = scores
 
