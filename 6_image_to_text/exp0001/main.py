@@ -36,13 +36,9 @@ from torchvision.transforms import Compose
 from torch.cuda.amp import autocast, GradScaler
 
 # transformers
-from transformers import (
-    DonutProcessor,
-    VisionEncoderDecoderConfig,
-    VisionEncoderDecoderModel,
-    get_scheduler
-)
+from transformers import AutoProcessor, Pix2StructForConditionalGeneration
 from transformers import PreTrainedTokenizerBase, PreTrainedModel
+from transformers.optimization import Adafactor, get_cosine_schedule_with_warmup
 
 from utils import seed_everything, AverageMeter, round_float, is_nan, get_lr
 from metrics import validation_metrics
@@ -495,9 +491,9 @@ def valid_function(
             bad_words_ids=[[processor.tokenizer.unk_token_id]],
             return_dict_in_generate=True
         )
-        # if step == 0:
-        #     print(output.sequences)
-        #     print(processor.tokenizer.batch_decode(output.sequences))
+        if step == 0:
+            print(output.sequences)
+            print(processor.tokenizer.batch_decode(output.sequences))
 
         outputs.extend(processor.tokenizer.batch_decode(output.sequences))
         ids.extend(batch['id'])
@@ -546,28 +542,24 @@ def main():
 
         # TODO: save dirにrestartで取ってこれるようにepochやbest scoreをjsonで保存するように実装
 
-        # model config
-        config = VisionEncoderDecoderConfig.from_pretrained(
-            cfg.pretrained_model_from_net_path)
-        config.encoder.image_size = (cfg.img_h, cfg.img_w)
-        config.decoder.max_length = cfg.max_length
-
         # processor
-        processor = DonutProcessor.from_pretrained(pretrained_path)
+        processor = AutoProcessor.from_pretrained(pretrained_path)
         processor.image_processor.size = {
             "height": cfg.img_h,
             "width": cfg.img_w,
         }
         global pad_token_id
         pad_token_id = processor.tokenizer.pad_token_id
-        config.pad_token_id = processor.tokenizer.pad_token_id
-        config.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids([
-                                                                                  PROMPT_TOKEN])[0]
 
         # model
-        model = VisionEncoderDecoderModel.from_pretrained(
-            pretrained_path, config=config).to(device)
+        model = Pix2StructForConditionalGeneration.from_pretrained(
+            pretrained_path).to(device)
         model.decoder.resize_token_embeddings(len(processor.tokenizer))
+        model.config.encoder.image_size = (cfg.img_h, cfg.img_w)
+        model.config.decoder.max_length = cfg.max_length
+        model.config.pad_token_id = processor.tokenizer.pad_token_id
+        model.config.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids([
+            PROMPT_TOKEN])[0]
 
         # data
         train_indices, valid_indices = indices_per_fold[fold]['train'], indices_per_fold[fold]['valid']
@@ -575,21 +567,15 @@ def main():
             cfg, LMDB_DIR, processor, train_indices, valid_indices)
 
         # optimizer
-        optimizer = torch.optim.AdamW(
-            model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+        optimizer = Adafactor(model.parameters(
+        ), scale_parameter=False, relative_step=False, lr=cfg.lr, weight_decay=cfg.weight_decay)
 
         # scaler
         scaler = GradScaler(enabled=cfg.use_amp)
 
         # scheduelr
-        if cfg.scheduler == 'CosineAnnealingWarmRestarts':
-            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
-                optimizer, T_0=cfg.T_0, eta_min=cfg.eta_min)
-        elif cfg.scheduler == 'OneCycleLR':
-            scheduler = optim.lr_scheduler.OneCycleLR(
-                optimizer, total_steps=cfg.n_epochs * len(train_loader), max_lr=cfg.lr, pct_start=cfg.pct_start, div_factor=cfg.div_factor, final_div_factor=cfg.final_div_factor)
-        else:
-            scheduler = None
+        scheduler = get_cosine_schedule_with_warmup(
+            optimizer, num_warmup_steps=1000, num_training_steps=40000)
 
         for epoch in range(1, cfg.n_epochs + 1):
             train_valid_one_epoch(

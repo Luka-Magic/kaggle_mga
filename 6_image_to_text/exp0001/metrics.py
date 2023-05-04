@@ -155,8 +155,6 @@ def benetech_score(ground_truth: pd.DataFrame, predictions: pd.DataFrame) -> flo
             print(gt_series)
             print(pred_series)
         scores.append(score)
-    print(f'NaN counts: {sum([np.isnan(score) for score in scores])}')
-    print('scores: ', scores)
 
     ground_truth["score"] = scores
 
