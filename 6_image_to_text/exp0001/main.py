@@ -541,6 +541,7 @@ def main():
             else cfg.pretrained_model_from_net_path
 
         # TODO: save dirにrestartで取ってこれるようにepochやbest scoreをjsonで保存するように実装
+        # config
 
         # processor
         processor = AutoProcessor.from_pretrained(pretrained_path)
@@ -548,18 +549,19 @@ def main():
             "height": cfg.img_h,
             "width": cfg.img_w,
         }
-        global pad_token_id
+        global new_tokens, pad_token_id
+        processor.tokenizer.add_tokens(new_tokens)
         pad_token_id = processor.tokenizer.pad_token_id
 
         # model
         model = Pix2StructForConditionalGeneration.from_pretrained(
             pretrained_path).to(device)
         model.decoder.resize_token_embeddings(len(processor.tokenizer))
-        model.config.encoder.image_size = (cfg.img_h, cfg.img_w)
-        model.config.decoder.max_length = cfg.max_length
-        model.config.pad_token_id = processor.tokenizer.pad_token_id
-        model.config.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids([
-            PROMPT_TOKEN])[0]
+        # model.config.encoder.image_size = (cfg.img_h, cfg.img_w)
+        # model.config.decoder.max_length = cfg.max_length
+        # model.config.pad_token_id = processor.tokenizer.pad_token_id
+        # model.config.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids([
+        #     PROMPT_TOKEN])[0]
 
         # data
         train_indices, valid_indices = indices_per_fold[fold]['train'], indices_per_fold[fold]['valid']
