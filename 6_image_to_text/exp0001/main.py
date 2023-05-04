@@ -273,7 +273,9 @@ class MgaDataset(Dataset):
         buf.seek(0)
         pixel_values = self.processor(
             images=Image.open(buf).convert('RGB'),
-            random_padding=True
+            random_padding=True,
+            add_special_tokens=True,
+            max_patches=self.cfg.max_patches
         ).pixel_values[0]
 
         # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']

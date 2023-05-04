@@ -14,7 +14,7 @@ n_valid_per_epoch: 10
 
 #####   Pretrained   ###################################
 restart: false
-pretrained_model_from_net_path: google/matcha-chartqa
+pretrained_model_from_net_path: google/matcha-chart2text-statista
 pretrained_model_path:
 
 ##### Optimizer ########################################
@@ -41,6 +41,7 @@ img_w: 560
 
 ##### Text Info #########################################
 max_length: 1024
+max_patches: 1024
 
 ##### DataLoader ########################################
 train_bs: 4
