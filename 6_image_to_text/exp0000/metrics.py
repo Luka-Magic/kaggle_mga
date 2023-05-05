@@ -109,7 +109,7 @@ def score_series(
     """
     if len(y_true) != len(y_pred):
         return 0.0
-    not_nan_pos = ~np.isnan(y_true)
+    not_nan_pos = pd.isna(y_true)
     y_true = [y_true[i] for i, v in enumerate(not_nan_pos) if v]
     y_pred = [y_pred[i] for i, v in enumerate(not_nan_pos) if v]
         
