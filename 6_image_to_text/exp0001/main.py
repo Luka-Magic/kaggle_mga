@@ -285,6 +285,8 @@ class MgaDataset(Dataset):
             add_special_tokens=True,
             max_patches=self.cfg.max_patches
         )
+        print(encoding.keys)
+        print(encoding)
 
         # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
         json_dict = json.loads(label)
