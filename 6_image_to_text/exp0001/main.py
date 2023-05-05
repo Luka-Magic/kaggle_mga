@@ -285,9 +285,7 @@ class MgaDataset(Dataset):
             add_special_tokens=True,
             max_patches=self.cfg.max_patches
         )
-        print(encoding)
-        print(encoding.keys())
-        encoding = {k: v.squeeze() for k, v in encoding.items()}
+        encoding = {k: torch.from_numpy(v[0]) for k, v in encoding.items()}
 
         # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
         json_dict = json.loads(label)
