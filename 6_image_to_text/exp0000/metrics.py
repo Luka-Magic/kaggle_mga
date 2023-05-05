@@ -145,8 +145,8 @@ def benetech_score(ground_truth: pd.DataFrame, predictions: pd.DataFrame) -> flo
     scores = []
     for (gt_series, gt_type), (pred_series, pred_type) in pairs:
         not_nan_pos = ~np.isnan(gt_series)
-        gt_series = gt_series[not_nan_pos]
-        pred_series = pred_series[not_nan_pos]
+        gt_series = [gt_series[i] for i, v in enumerate(non_nan_pos) if v]
+        pred_series = [pred_series[i] for i, v in enumerate(non_nan_pos) if v]
         if gt_type != pred_type:  # Check chart_type condition
             score = 0.0
         else:  # Score with RMSE or Levenshtein as appropriate
