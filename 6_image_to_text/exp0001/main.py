@@ -272,8 +272,9 @@ class MgaDataset(Dataset):
         buf = six.BytesIO()
         buf.write(imgbuf)
         buf.seek(0)
-        pixel_values = self.processor(
+        encoding = self.processor(
             images=Image.open(buf).convert('RGB'),
+            text="",
             random_padding=True,
             add_special_tokens=True,
             max_patches=self.cfg.max_patches
@@ -549,6 +550,11 @@ def main():
         model = Pix2StructForConditionalGeneration.from_pretrained(
             pretrained_path).to(device)
         model.decoder.resize_token_embeddings(len(processor.tokenizer))
+
+        # save
+        model.save_pretrained(str(SAVE_DIR))
+        processor.save_pretrained(
+            str(SAVE_DIR))
 
         # data
         train_indices, valid_indices = indices_per_fold[fold]['train'], indices_per_fold[fold]['valid']
