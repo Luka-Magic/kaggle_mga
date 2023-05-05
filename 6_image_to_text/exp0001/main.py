@@ -26,6 +26,10 @@ import wandb
 # sklearn
 from sklearn.model_selection import KFold, StratifiedKFold
 
+# albumentations
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+
 # pytorch
 import torch
 from torch import nn
@@ -172,11 +176,12 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
 
 # Dataset
 class MgaDataset(Dataset):
-    def __init__(self, cfg, lmdb_dir, indices, processor, output=True):
+    def __init__(self, cfg, lmdb_dir, indices, processor, transforms, output=True):
         self.cfg = cfg
         self.indices = indices
         self.processor = processor
         self.output = output
+        self.transforms = transforms
         self.env = lmdb.open(str(lmdb_dir), max_readers=32,
                              readonly=True, lock=False, readahead=False, meminit=False)
 
@@ -211,25 +216,25 @@ class MgaDataset(Dataset):
 
         return gt_string
 
-    def _replace_unk_tokens_with_one(self, example_ids: List[int], example_tokens: List[str], one_token_id: int, unk_token_id: int) -> List[int]:
-        """
-        <unk>でかつテキストが1のものを<one>のidにして返す。
+    # def _replace_unk_tokens_with_one(self, example_ids: List[int], example_tokens: List[str], one_token_id: int, unk_token_id: int) -> List[int]:
+    #     """
+    #     <unk>でかつテキストが1のものを<one>のidにして返す。
 
-        Args:
-            example_ids (list): tokenのid
-            example_tokens (list): tokenのテキスト
-            one_token_id (int): <one>のid
-            unk_token_id (int): <unk>のid
+    #     Args:
+    #         example_ids (list): tokenのid
+    #         example_tokens (list): tokenのテキスト
+    #         one_token_id (int): <one>のid
+    #         unk_token_id (int): <unk>のid
 
-        Returns:
-            list: 1を<one>のidに変換させたlist
-        """
-        replaced_ids = []
-        for id_, token in zip(example_ids, example_tokens):
-            if id_ == unk_token_id and token == "1":
-                id_ = one_token_id
-            replaced_ids.append(id_)
-        return replaced_ids
+    #     Returns:
+    #         list: 1を<one>のidに変換させたlist
+    #     """
+    #     replaced_ids = []
+    #     for id_, token in zip(example_ids, example_tokens):
+    #         if id_ == unk_token_id and token == "1":
+    #             id_ = one_token_id
+    #         replaced_ids.append(id_)
+    #     return replaced_ids
 
     def __len__(self):
         return len(self.indices)
@@ -272,8 +277,10 @@ class MgaDataset(Dataset):
         buf = six.BytesIO()
         buf.write(imgbuf)
         buf.seek(0)
+        image = Image.open(buf).convert('RGB')
+        image = self.transforms(image=image)['image']
         encoding = self.processor(
-            images=Image.open(buf).convert('RGB'),
+            images=image,
             random_padding=True,
             add_special_tokens=True,
             max_patches=self.cfg.max_patches
@@ -321,12 +328,29 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
     batch["id"] = [x["id"] for x in samples]
     return batch
 
+
+def get_transforms(cfg, phase='train'):
+    if phase == 'train':
+        return A.Compose([
+            A.Resize((cfg.img_h, cfg.img_w)),
+            A.Normalize(),
+            ToTensorV2()
+        ])
+    elif phase == 'valid':
+        return A.Compose([
+            A.Resize((cfg.img_h, cfg.img_w)),
+            A.Normalize(),
+            ToTensorV2()
+        ])
+
 # Dataloader
 
 
 def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices):
-    train_ds = MgaDataset(cfg, lmdb_dir, train_indices, processor)
-    valid_ds = MgaDataset(cfg, lmdb_dir, valid_indices, processor)
+    train_ds = MgaDataset(cfg, lmdb_dir, train_indices,
+                          processor, get_transforms(cfg, 'train'))
+    valid_ds = MgaDataset(cfg, lmdb_dir, valid_indices,
+                          processor, get_transforms(cfg, 'train'))
 
     train_loader = DataLoader(
         train_ds,
