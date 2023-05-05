@@ -109,10 +109,16 @@ def score_series(
     """
     if len(y_true) != len(y_pred):
         return 0.0
-    not_nan_pos = pd.isna(y_true)
-    y_true = [y_true[i] for i, v in enumerate(not_nan_pos) if v]
-    y_pred = [y_pred[i] for i, v in enumerate(not_nan_pos) if v]
-        
+    notna_y_true = []
+    notna_y_pred = []
+    for i, y in enumerate(y_true):
+        if isinstance(y, float) and np.isnan(y):
+            continue
+        notna_y_true.append(y_true[i])
+        notna_y_pred.append(y_pred[i])
+    
+    y_true = notna_y_true.copy()
+    y_pred = notna_y_pred.copy()
     if isinstance(y_true[0], str):
         return normalized_levenshtein_score(y_true, y_pred)
     else:
