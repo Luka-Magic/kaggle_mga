@@ -292,6 +292,7 @@ class MgaDataset(Dataset):
 
         gt_string = self._json_dict_to_gt_string(json_dict)
         encoding['text'] = gt_string
+        encoding['id'] = idx
 
         return encoding
 
