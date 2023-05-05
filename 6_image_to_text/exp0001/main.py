@@ -332,13 +332,13 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
 def get_transforms(cfg, phase='train'):
     if phase == 'train':
         return A.Compose([
-            A.Resize((cfg.img_h, cfg.img_w)),
+            A.Resize(height=cfg.img_h, width=cfg.img_w),
             A.Normalize(),
             ToTensorV2()
         ])
     elif phase == 'valid':
         return A.Compose([
-            A.Resize((cfg.img_h, cfg.img_w)),
+            A.Resize(height=cfg.img_h, width=cfg.img_w),
             A.Normalize(),
             ToTensorV2()
         ])
