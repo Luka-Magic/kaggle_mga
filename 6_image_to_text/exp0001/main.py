@@ -277,7 +277,7 @@ class MgaDataset(Dataset):
         buf = six.BytesIO()
         buf.write(imgbuf)
         buf.seek(0)
-        image = Image.open(buf).convert('RGB')
+        image = np.array(Image.open(buf).convert('RGB'))
         image = self.transforms(image=image)['image']
         encoding = self.processor(
             images=image,
