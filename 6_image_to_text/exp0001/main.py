@@ -279,14 +279,13 @@ class MgaDataset(Dataset):
         buf.seek(0)
         image = np.array(Image.open(buf).convert('RGB'))
         image = self.transforms(image=image)['image']
+        print('image_type: ', type(image))
         encoding = self.processor(
             images=image,
             random_padding=True,
             add_special_tokens=True,
             max_patches=self.cfg.max_patches
         )
-        print(encoding.keys)
-        print(encoding)
 
         # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
         json_dict = json.loads(label)
@@ -321,8 +320,8 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
     batch['labels'] = text_inputs.input_ids
 
     for item in samples:
-        batch["flattened_patches"].append(item["flattened_patches"])
-        batch["attention_mask"].append(item["attention_mask"])
+        batch["flattened_patches"].append(item["flattened_patches"][0])
+        batch["attention_mask"].append(item["attention_mask"][0])
     batch["flattened_patches"] = torch.stack(batch["flattened_patches"])
     batch["attention_mask"] = torch.stack(batch["attention_mask"])
 
