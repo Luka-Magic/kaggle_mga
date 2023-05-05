@@ -575,6 +575,8 @@ def main():
         model = Pix2StructForConditionalGeneration.from_pretrained(
             pretrained_path).to(device)
         model.decoder.resize_token_embeddings(len(processor.tokenizer))
+        model.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids([
+                                                                                 BOS_TOKEN])[0]
 
         # save
         model.save_pretrained(str(SAVE_DIR))
