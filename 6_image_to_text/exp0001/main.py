@@ -274,7 +274,6 @@ class MgaDataset(Dataset):
         buf.seek(0)
         encoding = self.processor(
             images=Image.open(buf).convert('RGB'),
-            text="",
             random_padding=True,
             add_special_tokens=True,
             max_patches=self.cfg.max_patches
@@ -542,6 +541,7 @@ def main():
             "height": cfg.img_h,
             "width": cfg.img_w,
         }
+        processor.image_processor.is_vqa = False
         global new_tokens, pad_token_id
         processor.tokenizer.add_tokens(new_tokens)
         pad_token_id = processor.tokenizer.pad_token_id
