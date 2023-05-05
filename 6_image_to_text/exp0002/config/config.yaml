@@ -14,7 +14,7 @@ n_valid_per_epoch: 5
 
 #####   Pretrained   ###################################
 restart: false
-pretrained_model_from_net_path: google/matcha-plotqa-v2
+pretrained_model_from_net_path: google/matcha-base
 pretrained_model_path:
 
 ##### Optimizer ########################################
