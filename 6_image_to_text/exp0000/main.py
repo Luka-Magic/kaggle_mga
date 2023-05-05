@@ -391,7 +391,6 @@ def train_valid_one_epoch(
 
     # train & valid
     for step, batch in pbar:
-        step += 1
         pixel_values = batch['pixel_values'].to(device)
         labels = batch["labels"].to(device)
         bs = len(pixel_values)
