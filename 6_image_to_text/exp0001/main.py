@@ -38,7 +38,7 @@ from torch.cuda.amp import autocast, GradScaler
 # transformers
 from transformers import AutoProcessor, Pix2StructForConditionalGeneration
 from transformers.optimization import Adafactor, get_cosine_schedule_with_warmup
-
+from transformers import PreTrainedTokenizerBase, PreTrainedModel
 from utils import seed_everything, AverageMeter, round_float, is_nan, get_lr
 from metrics import validation_metrics
 
