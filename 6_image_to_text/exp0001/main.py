@@ -44,14 +44,14 @@ from utils import seed_everything, AverageMeter, round_float, is_nan, get_lr
 from metrics import validation_metrics
 
 
-PROMPT_TOKEN = "<|PROMPT|>"
+BOS_TOKEN = "<|BOS|>"
 X_START = "<x_start>"
 X_END = "<x_end>"
 Y_START = "<y_start>"
 Y_END = "<y_end>"
 
 SEPARATOR_TOKENS = [
-    PROMPT_TOKEN,
+    BOS_TOKEN,
     X_START,
     X_END,
     Y_START,
@@ -84,6 +84,8 @@ CHART_TYPE2LABEL = {
 
 pad_token_id = None
 best_score = 0.
+processor = None
+max_length = 1024
 
 # Data split
 
@@ -206,7 +208,7 @@ class MgaDataset(Dataset):
         x_str = X_START + ";".join(list(map(str, all_x))) + X_END
         y_str = Y_START + ";".join(list(map(str, all_y))) + Y_END
 
-        gt_string = PROMPT_TOKEN + chart_type + x_str + y_str
+        gt_string = BOS_TOKEN + chart_type + x_str + y_str
 
         return gt_string
 
@@ -276,60 +278,46 @@ class MgaDataset(Dataset):
             random_padding=True,
             add_special_tokens=True,
             max_patches=self.cfg.max_patches
-        ).pixel_values[0]
+        )
+        encoding = {k: v.squeeze() for k, v in encoding.items()}
 
         # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
         json_dict = json.loads(label)
 
         gt_string = self._json_dict_to_gt_string(json_dict)
+        encoding['text'] = gt_string
 
-        ids = self.processor.tokenizer(
-            gt_string,
-            add_special_tokens=False,
-            max_length=self.cfg.max_length,
-            # batch内でmaxにpaddingするという意味。今回は1つの入力なのでpaddingされないはず。(max_lengthが関係ない)
-            padding=True,
-            truncation=True
-        ).input_ids
-
-        tokens = self.processor.tokenizer.tokenize(
-            gt_string, add_special_tokens=False)
-
-        one_token_id = self.processor.tokenizer(
-            '<one>', add_special_tokens=False).input_ids[0]
-        unk_token_id = self.processor.tokenizer.unk_token_id
-        final_ids = self._replace_unk_tokens_with_one(
-            ids, tokens, one_token_id, unk_token_id)
-
-        return {
-            'pixel_values': torch.tensor(pixel_values),
-            'input_ids': final_ids,
-            'id': idx,
-        }
+        return encoding
 
 # Collate_fn
 
 
 def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) -> Dict[str, Union[torch.Tensor, List[str]]]:
-    batch = {}
+    """
+    Returns:
+        batch (dict):
+            keys: (flattened_patches, attention_mask, labels, id)
+    """
 
-    batch['pixel_values'] = torch.stack([x['pixel_values'] for x in samples])
-
-    max_length = max([len(x["input_ids"]) for x in samples])
+    batch = {"flattened_patches": [], "attention_mask": []}
+    texts = [item['text'] for item in samples]
 
     # Make a multiple of 8 to efficiently use the tensor cores
-    if max_length % 8 != 0:
-        max_length = (max_length // 8 + 1) * 8
+    text_inputs = processor(
+        text=texts,
+        padding="max_length",
+        truncation=True,
+        return_tensors="pt",
+        add_special_tokens=True,
+        max_length=max_length
+    )
+    batch['labels'] = text_inputs.input_ids
 
-    input_ids = [
-        x["input_ids"] + [pad_token_id] * (max_length - len(x["input_ids"]))
-        for x in samples
-    ]
-
-    labels = torch.tensor(input_ids)
-    # ignore loss on padding tokens
-    labels[labels == pad_token_id] = -100
-    batch["labels"] = labels
+    for item in samples:
+        batch["flattened_patches"].append(item["flattened_patches"])
+        batch["attention_mask"].append(item["attention_mask"])
+    batch["flattened_patches"] = torch.stack(batch["flattened_patches"])
+    batch["attention_mask"] = torch.stack(batch["attention_mask"])
 
     batch["id"] = [x["id"] for x in samples]
     return batch
@@ -390,12 +378,14 @@ def train_valid_one_epoch(
     # train & valid
     for step, batch in pbar:
         step += 1
-        pixel_values = batch['pixel_values'].to(device)
+        flattened_patches = batch['flattened_patches'].to(device)
+        attention_mask = batch['attention_mask'].to(device)
         labels = batch["labels"].to(device)
-        bs = len(pixel_values)
+        bs = len(flattened_patches)
         with autocast(enabled=cfg.use_amp):
             output = model(
-                pixel_values=pixel_values,
+                flattened_patches=flattened_patches,
+                attention_mask=attention_mask,
                 labels=labels
             )
             loss = output.loss
@@ -403,7 +393,7 @@ def train_valid_one_epoch(
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
 
         train_losses.update(loss.item(), bs)
         lr = get_lr(optimizer)
@@ -472,8 +462,9 @@ def valid_function(
     ids = []
 
     for step, batch in enumerate(dataloader):
-        pixel_values = batch['pixel_values'].to(device)
-        bs = len(pixel_values)
+        flattened_patches = batch['flattened_patches'].to(device)
+        attention_mask = batch['attention_mask'].to(device)
+        bs = len(flattened_patches)
         decoder_input_ids = torch.full(
             (bs, 1),
             model.config.decoder_start_token_id,
@@ -481,7 +472,8 @@ def valid_function(
         )
 
         output = model.generate(
-            pixel_values,
+            flattened_patches=flattened_patches,
+            attention_mask=attention_mask,
             decoder_input_ids=decoder_input_ids,
             max_length=cfg.max_length,
             early_stopping=True,
@@ -493,9 +485,6 @@ def valid_function(
             bad_words_ids=[[processor.tokenizer.unk_token_id]],
             return_dict_in_generate=True
         )
-        if step == 0:
-            print(output.sequences)
-            print(processor.tokenizer.batch_decode(output.sequences))
 
         outputs.extend(processor.tokenizer.batch_decode(output.sequences))
         ids.extend(batch['id'])
@@ -559,11 +548,6 @@ def main():
         model = Pix2StructForConditionalGeneration.from_pretrained(
             pretrained_path).to(device)
         model.decoder.resize_token_embeddings(len(processor.tokenizer))
-        # model.config.encoder.image_size = (cfg.img_h, cfg.img_w)
-        # model.config.decoder.max_length = cfg.max_length
-        # model.config.pad_token_id = processor.tokenizer.pad_token_id
-        # model.config.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids([
-        #     PROMPT_TOKEN])[0]
 
         # data
         train_indices, valid_indices = indices_per_fold[fold]['train'], indices_per_fold[fold]['valid']

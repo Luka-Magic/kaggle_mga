@@ -109,6 +109,16 @@ def score_series(
     """
     if len(y_true) != len(y_pred):
         return 0.0
+    notna_y_true = []
+    notna_y_pred = []
+    for i, y in enumerate(y_true):
+        if isinstance(y, float) and np.isnan(y):
+            continue
+        notna_y_true.append(y_true[i])
+        notna_y_pred.append(y_pred[i])
+    
+    y_true = notna_y_true.copy()
+    y_pred = notna_y_pred.copy()
     if isinstance(y_true[0], str):
         return normalized_levenshtein_score(y_true, y_pred)
     else:
@@ -148,12 +158,6 @@ def benetech_score(ground_truth: pd.DataFrame, predictions: pd.DataFrame) -> flo
             score = 0.0
         else:  # Score with RMSE or Levenshtein as appropriate
             score = score_series(gt_series, pred_series)
-        if np.isnan(score):
-            print('score is NaN!!!')
-            print(gt_type)
-            print(pred_type)
-            print(gt_series)
-            print(pred_series)
         scores.append(score)
 
     ground_truth["score"] = scores
