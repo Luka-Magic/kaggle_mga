@@ -24,7 +24,7 @@ weight_decay: 1e-5
 
 ##### Scheduler ########################################
 # scheduler: OneCycleLR # OneCycleLR
-# scheduler_step_time: step
+scheduler_step_time: step
 # T_0: ${n_epochs} # CAWR
 # T_mult: 1 # CAWR
 # eta_min: 1e-9 # CAWR
