@@ -109,6 +109,10 @@ def score_series(
     """
     if len(y_true) != len(y_pred):
         return 0.0
+    not_nan_pos = ~np.isnan(y_true)
+    y_true = [y_true[i] for i, v in enumerate(not_nan_pos) if v]
+    y_pred = [y_pred[i] for i, v in enumerate(not_nan_pos) if v]
+        
     if isinstance(y_true[0], str):
         return normalized_levenshtein_score(y_true, y_pred)
     else:
@@ -144,9 +148,6 @@ def benetech_score(ground_truth: pd.DataFrame, predictions: pd.DataFrame) -> flo
     )
     scores = []
     for (gt_series, gt_type), (pred_series, pred_type) in pairs:
-        not_nan_pos = ~np.isnan(gt_series)
-        gt_series = [gt_series[i] for i, v in enumerate(not_nan_pos) if v]
-        pred_series = [pred_series[i] for i, v in enumerate(not_nan_pos) if v]
         if gt_type != pred_type:  # Check chart_type condition
             score = 0.0
         else:  # Score with RMSE or Levenshtein as appropriate
