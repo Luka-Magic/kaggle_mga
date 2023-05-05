@@ -37,7 +37,6 @@ from torch.cuda.amp import autocast, GradScaler
 
 # transformers
 from transformers import AutoProcessor, Pix2StructForConditionalGeneration
-from transformers import PreTrainedTokenizerBase, PreTrainedModel
 from transformers.optimization import Adafactor, get_cosine_schedule_with_warmup
 
 from utils import seed_everything, AverageMeter, round_float, is_nan, get_lr
@@ -533,7 +532,9 @@ def main():
 
         # TODO: save dirにrestartで取ってこれるようにepochやbest scoreをjsonで保存するように実装
         # config
-
+        global max_length
+        global processor
+        max_length = cfg.max_length
         # processor
         processor = AutoProcessor.from_pretrained(pretrained_path)
         processor.image_processor.size = {
