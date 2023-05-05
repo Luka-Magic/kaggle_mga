@@ -44,6 +44,6 @@ max_length: 1024
 max_patches: 1024
 
 ##### DataLoader ########################################
-train_bs: 4
-valid_bs: 4
+train_bs: 2
+valid_bs: 2
 num_workers: 2
