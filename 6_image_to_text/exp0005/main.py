@@ -452,8 +452,8 @@ def train_valid_one_epoch(
         pbar.set_postfix(OrderedDict(loss=train_losses.avg))
         if cfg.use_wandb:
             wandb.log({
-                'step': step + epoch * len(train_loader),
-                'loss': loss.item(),
+                'n_images': n_images,
+                'train_loss': loss.item(),
                 'lr': lr
             })
 
