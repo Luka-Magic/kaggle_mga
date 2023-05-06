@@ -307,8 +307,8 @@ class MgaDataset(Dataset):
                 'img_h': h,
                 'img_w': w,
                 'source': json_dict['source'],
-                'x_tick_type': json_dict['axis']['x-axis']['tick-type'],
-                'y_tick_type': json_dict['axis']['y-axis']['tick-type'],
+                'x_tick_type': json_dict['axes']['x-axis']['tick-type'],
+                'y_tick_type': json_dict['axes']['y-axis']['tick-type'],
                 'gt_x': x_str,
                 'gt_y': y_str,
                 'chart_type': json_dict['chart-type']
