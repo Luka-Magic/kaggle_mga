@@ -153,13 +153,14 @@ def benetech_score(ground_truth: pd.DataFrame, predictions: pd.DataFrame) -> flo
             index=False), predictions.itertuples(index=False)
     )
     scores = []
-    n_chart_type = len(pairs)
+    n_chart_type = 0
     chart_type_correct = 0
     for (gt_series, gt_type), (pred_series, pred_type) in pairs:
+        n_chart_type += 1
         if gt_type != pred_type:  # Check chart_type condition
-            chart_type_correct += 1
             score = 0.0
         else:  # Score with RMSE or Levenshtein as appropriate
+            chart_type_correct += 1
             score = score_series(gt_series, pred_series)
         scores.append(score)
 
