@@ -133,7 +133,7 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
         label_source = json_dict['source']
 
         if label_source == 'extracted':
-            extracted_indices.append(json_dict['id'])
+            extracted_indices.append(idx)
             extracted_info['chart_type'].append(json_dict['chart-type'])
             xs, ys = [], []
             for data_series_dict in json_dict['data-series']:
