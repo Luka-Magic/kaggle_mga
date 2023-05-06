@@ -540,8 +540,9 @@ def valid_function(
             output_scores=True
         )
         # print(type(output))
-        print(output.scores)
-        print(output.scores.shape)
+        print(output.scores[0])
+        print(output.scores[0].shape)
+        print(len(output.scores))
 
         outputs.extend(processor.tokenizer.batch_decode(output.sequences))
         ids.extend(batch['id'])
