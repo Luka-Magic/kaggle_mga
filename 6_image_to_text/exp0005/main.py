@@ -571,7 +571,7 @@ def create_wandb_table(
     for pred_dict, info_dict in zip(pred_list, table_info_list):
 
         wandb_dict['id'].append(pred_dict['id'])
-        wandb_dict['img'] = wandb.Image(info_dict['img'])
+        wandb_dict['img'].append(wandb.Image(info_dict['img']))
         wandb_dict['gt_x'].append(info_dict['gt_x'])
         wandb_dict['gt_y'].append(info_dict['gt_y'])
         wandb_dict['gt_chart_type'].append(info_dict['chart_type'])
@@ -587,7 +587,7 @@ def create_wandb_table(
         wandb_dict['valid_score'].append(scores['valid_score'])
 
     wandb_table = wandb.Table(columns=wandb_columns, data=[
-                              wandb_dict[column] for column in wandb_dict.keys()])
+                              wandb_dict[column] for column in wandb_columns])
     wandb.log(wandb_table)
 
 # main
