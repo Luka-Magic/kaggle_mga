@@ -546,8 +546,6 @@ def valid_function(
         ids.extend(batch['id'])
         for info in batch['info']:
             table_info_list.append(info)
-        if cfg.debug and step == 2:
-            break
 
     scores, pred_list = validation_metrics(outputs, ids, gt_df)
     create_wandb_table(table_info_list, pred_list, scores)
