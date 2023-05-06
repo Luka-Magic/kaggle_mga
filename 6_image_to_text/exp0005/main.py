@@ -540,13 +540,8 @@ def valid_function(
         outputs.extend(processor.tokenizer.batch_decode(output.sequences))
         ids.extend(batch['id'])
         for info in batch['info']:
-            info_dict = {
-                'epoch': epoch,
-                'n_images': n_images,
-            }
-            info_dict.update(info)
-            table_info_list.append(info_dict)
-        if cfg.debug and step == 5:
+            table_info_list.append(info)
+        if cfg.debug and step == 2:
             break
 
     scores, pred_list = validation_metrics(outputs, ids, gt_df)
@@ -562,12 +557,14 @@ def create_wandb_table(
     """
     Args:
         table_info_list (List[Dict[str, Any]]):
-            dict keys: [img, img_h, img_w, source, x_tick_type, y_tick_type, gt, chart_type, epoch, n_images]
+            dict keys: [img, img_h, img_w, source, x_tick_type, y_tick_type, gt, chart_type]
         pred_list (List[Dict[str, Any]]):
             dict keys: [id, x, y, chart_type]
         scores (Dict[str, Any]):
             keys: [valid_score, {chart-type}_score]
     """
+    global n_images
+    print(n_images)
     wandb_columns = ['id', 'gt_x', 'gt_y', 'gt_chart_type', 'pred_x', 'pred_y', 'pred_chart_type',
                      'n_image', 'img', 'img_h', 'img_w', 'source', 'x_tick_type', 'y_tick_type', 'valid_score']
     wandb_dict = {column: [] for column in wandb_columns}
@@ -579,7 +576,7 @@ def create_wandb_table(
         wandb_dict['pred_x'].append(pred_dict['x'])
         wandb_dict['pred_y'].append(pred_dict['y'])
         wandb_dict['pred_chart_type'].append(pred_dict['chart_type'])
-        wandb_dict['n_images'].append(info_dict['n_images'])
+        wandb_dict['n_images'].append(n_images)
         wandb_dict['img'] = wandb.Image(info_dict['img'])
         wandb_dict['img_h'].append(info_dict['img_h'])
         wandb_dict['img_w'].append(info_dict['img_w'])
