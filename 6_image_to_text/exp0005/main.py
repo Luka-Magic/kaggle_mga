@@ -590,6 +590,7 @@ def create_wandb_table(
             scores['valid_score']  # valid_score
         ]
         wandb_data.append(data_list)
+    print(wandb_data)
 
     wandb_table = wandb.Table(columns=wandb_columns, data=wandb_data)
     wandb.log({'valid result': wandb_table})
