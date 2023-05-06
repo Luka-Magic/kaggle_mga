@@ -566,7 +566,7 @@ def create_wandb_table(
     global n_images
     print(n_images)
     wandb_columns = ['id', 'gt_x', 'gt_y', 'gt_chart_type', 'pred_x', 'pred_y', 'pred_chart_type',
-                     'n_image', 'img', 'img_h', 'img_w', 'source', 'x_tick_type', 'y_tick_type', 'valid_score']
+                     'n_images', 'img', 'img_h', 'img_w', 'source', 'x_tick_type', 'y_tick_type', 'valid_score']
     wandb_dict = {column: [] for column in wandb_columns}
     for pred_dict, info_dict in zip(pred_list, table_info_list):
         wandb_dict['id'].append(pred_dict['id'])
