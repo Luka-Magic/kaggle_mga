@@ -564,14 +564,11 @@ def create_wandb_table(
             keys: [valid_score, {chart-type}_score]
     """
     global n_images
-    print(n_images)
     wandb_columns = ['id', 'img', 'gt_x', 'gt_y', 'gt_chart_type', 'pred_x', 'pred_y', 'pred_chart_type',
                      'n_images', 'img_h', 'img_w', 'source', 'x_tick_type', 'y_tick_type', 'valid_score']
     wandb_dict = {column: [] for column in wandb_columns}
 
     for pred_dict, info_dict in zip(pred_list, table_info_list):
-        print(info_dict['img'].shape)
-        print(type(info_dict['img']))
 
         wandb_dict['id'].append(pred_dict['id'])
         wandb_dict['img'] = wandb.Image(info_dict['img'])
@@ -590,7 +587,7 @@ def create_wandb_table(
         wandb_dict['valid_score'].append(scores['valid_score'])
 
     wandb_table = wandb.Table(columns=wandb_columns, data=[
-                              wandb_dict[column] for column in wandb_dict.values()])
+                              wandb_dict[column] for column in wandb_dict.keys()])
     wandb.log(wandb_table)
 
 # main
