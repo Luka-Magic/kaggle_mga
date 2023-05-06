@@ -624,8 +624,8 @@ def main():
             wandb.config.fold = fold
 
         # restart or load pretrained model from internet
-        pretrained_path = cfg.pretrained_model_dir if cfg.restart \
-            else str(SAVE_DIR.parent / cfg.pretrained_model_exp_name)
+        pretrained_path = str(SAVE_DIR.parent / cfg.pretrained_model_exp_name) if cfg.restart \
+            else cfg.pretrained_model_from_net_path
 
         # TODO: save dirにrestartで取ってこれるようにepochやbest scoreをjsonで保存するように実装
         # config
@@ -633,6 +633,7 @@ def main():
         global processor
         max_length = cfg.max_length
         # processor
+        print(pretrained_path)
         processor = AutoProcessor.from_pretrained(pretrained_path)
         processor.image_processor.size = {
             "height": cfg.img_h,
