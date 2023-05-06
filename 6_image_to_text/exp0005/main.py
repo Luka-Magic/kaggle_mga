@@ -372,9 +372,9 @@ def get_transforms(cfg, phase='train'):
 
 def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices):
     train_ds = MgaDataset(cfg, lmdb_dir, train_indices,
-                          processor, get_transforms(cfg, 'train'))
+                          processor, 'train', get_transforms(cfg, 'train'))
     valid_ds = MgaDataset(cfg, lmdb_dir, valid_indices,
-                          processor, get_transforms(cfg, 'train'))
+                          processor, 'valid', get_transforms(cfg, 'train'))
 
     train_loader = DataLoader(
         train_ds,
