@@ -536,9 +536,12 @@ def valid_function(
             num_beams=1,
             top_k=1,
             bad_words_ids=[[processor.tokenizer.unk_token_id]],
-            return_dict_in_generate=True
+            return_dict_in_generate=True,
+            output_scores=True
         )
-        print(type(output))
+        # print(type(output))
+        print(output.scores)
+        print(output.scores.shape)
 
         outputs.extend(processor.tokenizer.batch_decode(output.sequences))
         ids.extend(batch['id'])
