@@ -546,13 +546,19 @@ def valid_function(
             }
             info_dict.update(info)
             table_info_list.append(info_dict)
+        if cfg.debug and step == 5:
+            break
 
     scores, pred_list = validation_metrics(outputs, ids, gt_df)
     create_wandb_table(table_info_list, pred_list, scores)
     return scores
 
 
-def create_wandb_table(table_info_list: List[Dict[str, Any]], pred_list: List[Dict[str, Any]], scores: Dict[str, Any]):
+def create_wandb_table(
+    table_info_list: List[Dict[str, Any]],
+    pred_list: List[Dict[str, Any]],
+    scores: Dict[str, Any]
+):
     """
     Args:
         table_info_list (List[Dict[str, Any]]):
@@ -566,7 +572,7 @@ def create_wandb_table(table_info_list: List[Dict[str, Any]], pred_list: List[Di
     global n_images
     wandb_columns = ['id', 'gt_x', 'gt_y', 'gt_chart_type', 'pred_x', 'pred_y', 'pred_chart_type',
                      'n_image', 'img', 'img_h', 'img_w', 'source', 'x_tick_type', 'y_tick_type', 'valid_score']
-    wandb_dict = [{column: []} for column in wandb_columns]
+    wandb_dict = {column: [] for column in wandb_columns}
     for pred_dict, info_dict in zip(pred_list, table_info_list):
         wandb_dict['id'].append(pred_dict['id'])
         wandb_dict['gt_x'].append(info_dict['gt_x'])

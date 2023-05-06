@@ -243,9 +243,9 @@ def validation_metrics(val_outputs: List[str], val_ids: List[str], gt_df: pd.Dat
         }
     )
     pred_list_for_table = []
-    for (id, (chart_type, x, y)) in zip(val_ids, pred_triplets):
+    for (id_, (chart_type, x, y)) in zip(val_ids, pred_triplets):
         pred_list_for_table.append(
-            {'id': id, 'x': x, 'y': y, 'chart_type': chart_type})
+            {'id': id_, 'x': x, 'y': y, 'chart_type': chart_type})
 
     overall_score, chart_type2score = benetech_score(
         gt_df.loc[pred_df.index.values], pred_df
