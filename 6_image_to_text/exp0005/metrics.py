@@ -255,7 +255,7 @@ def validation_metrics(val_outputs: List[str], val_ids: List[str], gt_df: pd.Dat
     # scores: pred_dfの順に並ぶ
 
     pred_list_for_table = []
-    for (id_, (chart_type, x, y, score)) in zip(val_ids, pred_triplets, scores):
+    for (id_, (chart_type, x, y), score) in zip(val_ids, pred_triplets, scores):
         pred_list_for_table.append(
             {'id': id_, 'x': x, 'y': y, 'chart_type': chart_type, 'score': score})
 
