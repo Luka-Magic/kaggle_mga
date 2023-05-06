@@ -565,8 +565,8 @@ def create_wandb_table(
     """
     global n_images
     print(n_images)
-    wandb_columns = ['id', 'gt_x', 'gt_y', 'gt_chart_type', 'pred_x', 'pred_y', 'pred_chart_type',
-                     'n_images', 'img', 'img_h', 'img_w', 'source', 'x_tick_type', 'y_tick_type', 'valid_score']
+    wandb_columns = ['id', 'img', 'gt_x', 'gt_y', 'gt_chart_type', 'pred_x', 'pred_y', 'pred_chart_type',
+                     'n_images', 'img_h', 'img_w', 'source', 'x_tick_type', 'y_tick_type', 'valid_score']
     wandb_dict = {column: [] for column in wandb_columns}
 
     for pred_dict, info_dict in zip(pred_list, table_info_list):
@@ -574,6 +574,7 @@ def create_wandb_table(
         print(type(info_dict['img']))
 
         wandb_dict['id'].append(pred_dict['id'])
+        wandb_dict['img'] = wandb.Image(info_dict['img'])
         wandb_dict['gt_x'].append(info_dict['gt_x'])
         wandb_dict['gt_y'].append(info_dict['gt_y'])
         wandb_dict['gt_chart_type'].append(info_dict['chart_type'])
@@ -581,15 +582,15 @@ def create_wandb_table(
         wandb_dict['pred_y'].append(pred_dict['y'])
         wandb_dict['pred_chart_type'].append(pred_dict['chart_type'])
         wandb_dict['n_images'].append(n_images)
-        wandb_dict['img'] = wandb.Image(info_dict['img'])
         wandb_dict['img_h'].append(info_dict['img_h'])
         wandb_dict['img_w'].append(info_dict['img_w'])
         wandb_dict['source'].append(info_dict['source'])
         wandb_dict['x_tick_type'].append(info_dict['x_tick_type'])
         wandb_dict['y_tick_type'].append(info_dict['y_tick_type'])
         wandb_dict['valid_score'].append(scores['valid_score'])
-    wandb_df = pd.DataFrame.from_dict(wandb_dict, orient='index').T
-    wandb_table = wandb.Table(wandb_df)
+
+    wandb_table = wandb.Table(columns=wandb_columns, data=[
+                              wandb_dict[column] for column in wandb_dict.values()])
     wandb.log(wandb_table)
 
 # main
