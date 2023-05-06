@@ -153,8 +153,11 @@ def benetech_score(ground_truth: pd.DataFrame, predictions: pd.DataFrame) -> flo
             index=False), predictions.itertuples(index=False)
     )
     scores = []
+    n_chart_type = len(pairs)
+    chart_type_correct = 0
     for (gt_series, gt_type), (pred_series, pred_type) in pairs:
         if gt_type != pred_type:  # Check chart_type condition
+            chart_type_correct += 1
             score = 0.0
         else:  # Score with RMSE or Levenshtein as appropriate
             score = score_series(gt_series, pred_series)
@@ -170,7 +173,9 @@ def benetech_score(ground_truth: pd.DataFrame, predictions: pd.DataFrame) -> flo
         for chart_type, score in zip(grouped["chart_type"], grouped["score"])
     }
 
-    return np.mean(scores), chart_type2score
+    chart_type_acc = chart_type_correct / n_chart_type
+
+    return np.mean(scores), chart_type2score, scores, chart_type_acc
 
 
 def string2triplet(pred_string: str) -> Tuple[str, List[str], List[str]]:
@@ -242,16 +247,19 @@ def validation_metrics(val_outputs: List[str], val_ids: List[str], gt_df: pd.Dat
             "chart_type": [x[0] for x in pred_triplets] * 2,
         }
     )
-    pred_list_for_table = []
-    for (id_, (chart_type, x, y)) in zip(val_ids, pred_triplets):
-        pred_list_for_table.append(
-            {'id': id_, 'x': x, 'y': y, 'chart_type': chart_type})
 
-    overall_score, chart_type2score = benetech_score(
+    overall_score, chart_type2score, scores, chart_type_acc = benetech_score(
         gt_df.loc[pred_df.index.values], pred_df
     )
+    # scores: pred_dfの順に並ぶ
+
+    pred_list_for_table = []
+    for (id_, (chart_type, x, y, score)) in zip(val_ids, pred_triplets, scores):
+        pred_list_for_table.append(
+            {'id': id_, 'x': x, 'y': y, 'chart_type': chart_type, 'score': score})
 
     return {
         "valid_score": overall_score,
+        "chart_acc": chart_type_acc,
         **{f"{k}_score": v for k, v in chart_type2score.items()},
     }, pred_list_for_table

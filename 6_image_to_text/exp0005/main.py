@@ -465,10 +465,12 @@ def train_valid_one_epoch(
                                          processor, model, device, gt_df)
             model.train()
             valid_count_per_epoch += 1
-            print("=" * 80)
+            print("\n" + "=" * 80)
             print(
                 f'Fold {fold} | Epoch {epoch}/{cfg.n_epochs} ({valid_count_per_epoch}/{cfg.n_valid_per_epoch})')
-            print(f'    TRAIN: loss: {train_losses.avg:.6f}')
+            print(f'    TRAIN:')
+            print(f'            loss: {train_losses.avg:.6f}')
+            print(f'    VALID:')
             for valid_score_name, valid_score_value in valid_score.items():
                 print(
                     f'            {valid_score_name}: {valid_score_value:.6f}')
@@ -539,10 +541,6 @@ def valid_function(
             return_dict_in_generate=True,
             output_scores=True
         )
-        # print(type(output))
-        print(output.scores[0])
-        print(output.scores[0].shape)
-        print(len(output.scores))
 
         outputs.extend(processor.tokenizer.batch_decode(output.sequences))
         ids.extend(batch['id'])
@@ -566,12 +564,12 @@ def create_wandb_table(
         table_info_list (List[Dict[str, Any]]):
             dict keys: [img, img_h, img_w, source, x_tick_type, y_tick_type, gt, chart_type]
         pred_list (List[Dict[str, Any]]):
-            dict keys: [id, x, y, chart_type]
+            dict keys: [id, x, y, chart_type, score]
         scores (Dict[str, Any]):
             keys: [valid_score, {chart-type}_score]
     """
     global n_images
-    wandb_columns = ['id', 'img', 'gt_x', 'gt_y', 'gt_chart_type', 'pred_x', 'pred_y', 'pred_chart_type',
+    wandb_columns = ['id', 'img', 'gt_x', 'gt_y', 'gt_chart_type', 'pred_x', 'pred_y', 'pred_chart_type', 'score',
                      'n_images', 'img_h', 'img_w', 'source', 'x_tick_type', 'y_tick_type', 'valid_score']
     wandb_dict = {column: [] for column in wandb_columns}
     wandb_data = []
@@ -586,6 +584,7 @@ def create_wandb_table(
             pred_dict['x'],  # pred_x
             pred_dict['y'],  # pred_y
             pred_dict['chart_type'],  # pred_chart_type
+            pred_dict['score'],
             n_images,  # n_images
             info_dict['img_h'],  # img_h
             info_dict['img_w'],  # img_w
