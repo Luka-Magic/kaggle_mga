@@ -119,6 +119,8 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
         'y': [],
     }
     stratified_label = []
+    if cfg.debug:
+        n_samples = 5000
 
     for idx in tqdm(range(n_samples), total=n_samples):
         with env.begin(write=False) as txn:
@@ -130,9 +132,6 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
         label_source = json_dict['source']
 
         if label_source == 'extracted':
-            if cfg.debug:
-                if 0.1 < np.random.rand():
-                    continue
             extracted_indices.append(idx)
             extracted_info['chart_type'].append(json_dict['chart-type'])
             xs, ys = [], []
