@@ -219,7 +219,7 @@ class MgaDataset(Dataset):
 
         gt_string = BOS_TOKEN + chart_type + x_str + y_str
 
-        return gt_string, all_x, all_y
+        return gt_string, x_str, y_str
 
     # def _replace_unk_tokens_with_one(self, example_ids: List[int], example_tokens: List[str], one_token_id: int, unk_token_id: int) -> List[int]:
     #     """
