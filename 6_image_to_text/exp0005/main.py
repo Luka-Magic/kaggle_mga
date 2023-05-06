@@ -115,6 +115,7 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
 
     extracted_info = {
         'chart_type': [],
+        'id': [],
         'x': [],
         'y': [],
     }
