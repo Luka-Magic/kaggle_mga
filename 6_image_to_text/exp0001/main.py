@@ -534,12 +534,9 @@ def main():
 
     seed_everything(cfg.seed)
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
     if cfg.use_wandb:
         wandb.login()
 
-    seed_everything(cfg.seed)
     device = torch.device('cuda') if torch.cuda.is_available() else 'cpu'
     indices_per_fold = split_data(cfg, LMDB_DIR)
 
