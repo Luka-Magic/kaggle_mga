@@ -130,6 +130,9 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
         label_source = json_dict['source']
 
         if label_source == 'extracted':
+            if cfg.debug:
+                if 0.1 < np.random.rand():
+                    continue
             extracted_indices.append(idx)
             extracted_info['chart_type'].append(json_dict['chart-type'])
             xs, ys = [], []
@@ -151,7 +154,7 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
                 train_indices = [extracted_indices[i]
                                  for i in train_fold_indices]
                 valid_indices = [extracted_indices[i]
-                                 for i in valid_fold_indices[:15]]
+                                 for i in valid_fold_indices]
             else:
                 train_indices = [extracted_indices[i]
                                  for i in train_fold_indices] + generated_indicies
