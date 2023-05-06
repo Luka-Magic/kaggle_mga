@@ -132,12 +132,13 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
         label_source = json_dict['source']
 
         if label_source == 'extracted':
-            extracted_indices.append(idx)
+            extracted_indices.append(json_dict['id'])
             extracted_info['chart_type'].append(json_dict['chart-type'])
             xs, ys = [], []
             for data_series_dict in json_dict['data-series']:
                 xs.append(data_series_dict['x'])
                 ys.append(data_series_dict['y'])
+            extracted_info['id'].append(json_dict['id'])
             extracted_info['x'].append(xs)
             extracted_info['y'].append(ys)
             stratified_label.append(CHART_TYPE2LABEL[json_dict['chart-type']])
@@ -160,8 +161,8 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
                 valid_indices = [extracted_indices[i]
                                  for i in valid_fold_indices]
             gt_df = pd.DataFrame(
-                index=[f"{id_}_x" for id_ in valid_indices] +
-                [f"{id_}_y" for id_ in valid_indices],
+                index=[f"{id_}_x" for id_ in extracted_fold_info['id']] +
+                [f"{id_}_y" for id_ in extracted_fold_info['id']],
                 data={
                     "data_series": extracted_fold_info['x'] + extracted_fold_info['y'],
                     "chart_type": extracted_fold_info['chart_type'] * 2,
@@ -217,7 +218,7 @@ class MgaDataset(Dataset):
 
         gt_string = BOS_TOKEN + chart_type + x_str + y_str
 
-        return gt_string, x_str, y_str
+        return gt_string, all_x, all_y
 
     # def _replace_unk_tokens_with_one(self, example_ids: List[int], example_tokens: List[str], one_token_id: int, unk_token_id: int) -> List[int]:
     #     """
@@ -296,10 +297,10 @@ class MgaDataset(Dataset):
         # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
         json_dict = json.loads(label)
 
-        gt_string, x_str, y_str = self._json_dict_to_gt_string(json_dict)
+        gt_string, x_list, y_list = self._json_dict_to_gt_string(json_dict)
 
         encoding['text'] = gt_string
-        encoding['id'] = idx
+        encoding['id'] = json_dict['id']
         encoding['phase'] = self.phase
         if self.phase == 'valid':
             encoding['info'] = {
@@ -309,8 +310,8 @@ class MgaDataset(Dataset):
                 'source': json_dict['source'],
                 'x_tick_type': json_dict['axes']['x-axis']['tick-type'],
                 'y_tick_type': json_dict['axes']['y-axis']['tick-type'],
-                'gt_x': x_str,
-                'gt_y': y_str,
+                'gt_x': x_list,
+                'gt_y': y_list,
                 'chart_type': json_dict['chart-type']
             }
         return encoding
