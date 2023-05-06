@@ -590,7 +590,7 @@ def create_wandb_table(
         wandb_data.append(data_list)
 
     wandb_table = wandb.Table(columns=wandb_columns, data=wandb_data)
-    wandb.log(wandb_table)
+    wandb.log({'valid result': wandb_table})
 
 # main
 
@@ -633,7 +633,6 @@ def main():
         global processor
         max_length = cfg.max_length
         # processor
-        print(pretrained_path)
         processor = AutoProcessor.from_pretrained(pretrained_path)
         processor.image_processor.size = {
             "height": cfg.img_h,
@@ -650,6 +649,11 @@ def main():
         model.decoder.resize_token_embeddings(len(processor.tokenizer))
         model.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids([
                                                                                  BOS_TOKEN])[0]
+        print(f'load model: {pretrained_path}')
+        if cfg.restart:
+            print(f'------------ Restart Learning ------------')
+        else:
+            print('------------Start Learning------------')
 
         # save
         model.save_pretrained(str(SAVE_DIR))
