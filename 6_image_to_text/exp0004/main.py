@@ -89,6 +89,7 @@ pad_token_id = None
 best_score = 0.
 processor = None
 max_length = 1024
+n_images = 0
 
 # Data split
 
@@ -114,10 +115,13 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
 
     extracted_info = {
         'chart_type': [],
+        'id': [],
         'x': [],
         'y': [],
     }
     stratified_label = []
+    if cfg.debug:
+        n_samples = 5000
 
     for idx in tqdm(range(n_samples), total=n_samples):
         with env.begin(write=False) as txn:
@@ -135,6 +139,7 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
             for data_series_dict in json_dict['data-series']:
                 xs.append(data_series_dict['x'])
                 ys.append(data_series_dict['y'])
+            extracted_info['id'].append(json_dict['id'])
             extracted_info['x'].append(xs)
             extracted_info['y'].append(ys)
             stratified_label.append(CHART_TYPE2LABEL[json_dict['chart-type']])
@@ -157,8 +162,8 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
                 valid_indices = [extracted_indices[i]
                                  for i in valid_fold_indices]
             gt_df = pd.DataFrame(
-                index=[f"{id_}_x" for id_ in valid_indices] +
-                [f"{id_}_y" for id_ in valid_indices],
+                index=[f"{id_}_x" for id_ in extracted_fold_info['id']] +
+                [f"{id_}_y" for id_ in extracted_fold_info['id']],
                 data={
                     "data_series": extracted_fold_info['x'] + extracted_fold_info['y'],
                     "chart_type": extracted_fold_info['chart_type'] * 2,
@@ -176,11 +181,11 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
 
 # Dataset
 class MgaDataset(Dataset):
-    def __init__(self, cfg, lmdb_dir, indices, processor, transforms, output=True):
+    def __init__(self, cfg, lmdb_dir, indices, processor, transforms, phase):
         self.cfg = cfg
         self.indices = indices
         self.processor = processor
-        self.output = output
+        self.phase = phase
         self.transforms = transforms
         self.env = lmdb.open(str(lmdb_dir), max_readers=32,
                              readonly=True, lock=False, readahead=False, meminit=False)
@@ -214,7 +219,7 @@ class MgaDataset(Dataset):
 
         gt_string = BOS_TOKEN + chart_type + x_str + y_str
 
-        return gt_string
+        return gt_string, list(map(str, all_x)), list(map(str, all_y))
 
     # def _replace_unk_tokens_with_one(self, example_ids: List[int], example_tokens: List[str], one_token_id: int, unk_token_id: int) -> List[int]:
     #     """
@@ -249,13 +254,15 @@ class MgaDataset(Dataset):
 
         label
             - byteからjson.loadsでdictにする
-                keys: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
+                keys: ['source', 'chart-type', 'plot-bb', 'text',
+                    'axes', 'data-series', 'id', 'key_point']
             - 'data-series'からprocessor.tokenizerでid化
             - processor.tokenizer.tokenizeでテキストで<unk>のものが出る
             - idが<unk>のidでかつtextが'1'である場所を<one>のidに変換する。このidを最終的なidとする
 
         中間にこの変数が必要？
-            keys: (ground_truth, x, y, chart-type, id, source, image_path, width, height, unk_tokens)
+            keys: (ground_truth, x, y, chart-type, id, source,
+                   image_path, width, height, unk_tokens)
 
         Returns:
             samples (Dict[str, Union[torch.Tensor, List[int], str]])
@@ -277,8 +284,9 @@ class MgaDataset(Dataset):
         buf = six.BytesIO()
         buf.write(imgbuf)
         buf.seek(0)
-        image = np.array(Image.open(buf).convert('RGB'))
-        image = self.transforms(image=image)['image']
+        image_arr = np.array(Image.open(buf).convert('RGB'))
+        h, w, _ = image_arr.shape
+        image = self.transforms(image=image_arr)['image']
         encoding = self.processor(
             images=image,
             random_padding=True,
@@ -290,10 +298,23 @@ class MgaDataset(Dataset):
         # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
         json_dict = json.loads(label)
 
-        gt_string = self._json_dict_to_gt_string(json_dict)
-        encoding['text'] = gt_string
-        encoding['id'] = idx
+        gt_string, x_list, y_list = self._json_dict_to_gt_string(json_dict)
 
+        encoding['text'] = gt_string
+        encoding['id'] = json_dict['id']
+        encoding['phase'] = self.phase
+        if self.phase == 'valid':
+            encoding['info'] = {
+                'img': image_arr,
+                'img_h': h,
+                'img_w': w,
+                'source': json_dict['source'],
+                'x_tick_type': json_dict['axes']['x-axis']['tick-type'],
+                'y_tick_type': json_dict['axes']['y-axis']['tick-type'],
+                'gt_x': x_list,
+                'gt_y': y_list,
+                'chart_type': json_dict['chart-type']
+            }
         return encoding
 
 # Collate_fn
@@ -308,6 +329,8 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
 
     batch = {"flattened_patches": [], "attention_mask": []}
     texts = [item['text'] for item in samples]
+
+    phase = samples[0]['phase']
 
     # Make a multiple of 8 to efficiently use the tensor cores
     text_inputs = processor(
@@ -327,6 +350,8 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
     batch["attention_mask"] = torch.stack(batch["attention_mask"])
 
     batch["id"] = [x["id"] for x in samples]
+    if phase == 'valid':
+        batch['info'] = [x['info'] for x in samples]
     return batch
 
 
@@ -349,10 +374,9 @@ def get_transforms(cfg, phase='train'):
 
 def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices):
     train_ds = MgaDataset(cfg, lmdb_dir, train_indices,
-                          processor, get_transforms(cfg, 'train'))
+                          processor, get_transforms(cfg, 'train'), 'train')
     valid_ds = MgaDataset(cfg, lmdb_dir, valid_indices,
-                          processor, get_transforms(cfg, 'train'))
-
+                          processor, get_transforms(cfg, 'train'), 'valid')
     train_loader = DataLoader(
         train_ds,
         batch_size=cfg.train_bs,
@@ -390,7 +414,7 @@ def train_valid_one_epoch(
     scaler: torch.cuda.amp.GradScaler,
     gt_df: pd.DataFrame
 ):
-    global best_score
+    global best_score, n_images
 
     model.train()
 
@@ -406,6 +430,8 @@ def train_valid_one_epoch(
         attention_mask = batch['attention_mask'].to(device)
         labels = batch["labels"].to(device)
         bs = len(flattened_patches)
+        n_images += bs
+
         with autocast(enabled=cfg.use_amp):
             output = model(
                 flattened_patches=flattened_patches,
@@ -428,8 +454,8 @@ def train_valid_one_epoch(
         pbar.set_postfix(OrderedDict(loss=train_losses.avg))
         if cfg.use_wandb:
             wandb.log({
-                'step': step + epoch * len(train_loader),
-                'loss': loss.item(),
+                'n_images': n_images,
+                'train_loss': loss.item(),
                 'lr': lr
             })
 
@@ -439,10 +465,12 @@ def train_valid_one_epoch(
                                          processor, model, device, gt_df)
             model.train()
             valid_count_per_epoch += 1
-            print("=" * 80)
+            print("\n" + "=" * 80)
             print(
                 f'Fold {fold} | Epoch {epoch}/{cfg.n_epochs} ({valid_count_per_epoch}/{cfg.n_valid_per_epoch})')
-            print(f'    TRAIN: loss: {train_losses.avg:.6f}')
+            print(f'    TRAIN:')
+            print(f'            loss: {train_losses.avg:.6f}')
+            print(f'    VALID:')
             for valid_score_name, valid_score_value in valid_score.items():
                 print(
                     f'            {valid_score_name}: {valid_score_value:.6f}')
@@ -451,6 +479,7 @@ def train_valid_one_epoch(
             # log
             if cfg.use_wandb:
                 wandb_log = {
+                    'n_images': n_images,
                     'epoch': epoch,
                     'train_loss': train_losses.avg,
                 }
@@ -464,6 +493,13 @@ def train_valid_one_epoch(
                 model.save_pretrained(str(save_dir))
                 processor.save_pretrained(
                     str(save_dir))
+                with open(save_dir / 'best_score_info.json', 'w') as f:
+                    save_dict = {fold: {
+                        'epoch': epoch,
+                        'n_images': n_images,
+                        'best_score': best_score
+                    }}
+                    json.dump(save_dict, f)
                 if cfg.use_wandb:
                     wandb.run.summary['best_score'] = best_score
         if scheduler_step_time == 'epoch':
@@ -479,11 +515,13 @@ def valid_function(
     device: torch.device,
     gt_df: pd.DataFrame
 ) -> Dict[str, float]:
+    global n_images
 
     model.eval()
 
     outputs = []
     ids = []
+    table_info_list = []
 
     for step, batch in enumerate(dataloader):
         flattened_patches = batch['flattened_patches'].to(device)
@@ -507,15 +545,68 @@ def valid_function(
             num_beams=1,
             top_k=1,
             bad_words_ids=[[processor.tokenizer.unk_token_id]],
-            return_dict_in_generate=True
+            return_dict_in_generate=True,
+            output_scores=True
         )
 
         outputs.extend(processor.tokenizer.batch_decode(output.sequences))
         ids.extend(batch['id'])
+        for info in batch['info']:
+            table_info_list.append(info)
 
-    scores = validation_metrics(outputs, ids, gt_df)
-
+    scores, pred_list = validation_metrics(outputs, ids, gt_df)
+    create_wandb_table(table_info_list, pred_list, scores)
     return scores
+
+
+def create_wandb_table(
+    table_info_list: List[Dict[str, Any]],
+    pred_list: List[Dict[str, Any]],
+    scores: Dict[str, Any]
+):
+    """
+    Args:
+        table_info_list (List[Dict[str, Any]]):
+            dict keys: [img, img_h, img_w, source, x_tick_type, y_tick_type, gt, chart_type]
+        pred_list (List[Dict[str, Any]]):
+            dict keys: [id, x, y, chart_type, score]
+        scores (Dict[str, Any]):
+            keys: [valid_score, {chart-type}_score]
+    """
+    global n_images
+    wandb_columns = ['id', 'img', 'gt_x', 'gt_y', 'gt_x_len', 'gt_y_len', 'gt_chart_type', 'pred_x', 'pred_y', 'pred_x_len', 'pred_y_len', 'pred_chart_type', 'score',
+                     'n_images', 'img_h', 'img_w', 'source', 'x_tick_type', 'y_tick_type', 'valid_score']
+    wandb_dict = {column: [] for column in wandb_columns}
+    wandb_data = []
+
+    for pred_dict, info_dict in zip(pred_list, table_info_list):
+        data_list = [
+            pred_dict['id'],  # id
+            wandb.Image(info_dict['img']),  # img
+            info_dict['gt_x'],  # gt_x
+            info_dict['gt_y'],  # gt_y
+            len(info_dict['gt_x']),  # gt_x_len
+            len(info_dict['gt_y']),  # gt_y_len
+            info_dict['chart_type'],  # gt_chart_type
+            pred_dict['x'],  # pred_x
+            pred_dict['y'],  # pred_y
+            len(pred_dict['x']),  # pred_x_len
+            len(pred_dict['y']),  # pred_y_len
+            pred_dict['chart_type'],  # pred_chart_type
+            pred_dict['score'],
+            n_images,  # n_images
+            info_dict['img_h'],  # img_h
+            info_dict['img_w'],  # img_w
+            info_dict['source'],  # source
+            info_dict['x_tick_type'],  # x_tick_type
+            info_dict['y_tick_type'],  # y_tick_type
+            scores['valid_score']  # valid_score
+        ]
+        wandb_data.append(data_list)
+    print(wandb_data)
+
+    wandb_table = wandb.Table(columns=wandb_columns, data=wandb_data)
+    wandb.log({'valid result': wandb_table})
 
 # main
 
@@ -534,12 +625,9 @@ def main():
 
     seed_everything(cfg.seed)
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
     if cfg.use_wandb:
         wandb.login()
 
-    seed_everything(cfg.seed)
     device = torch.device('cuda') if torch.cuda.is_available() else 'cpu'
     indices_per_fold = split_data(cfg, LMDB_DIR)
 
@@ -552,31 +640,46 @@ def main():
             wandb.config.fold = fold
 
         # restart or load pretrained model from internet
-        pretrained_path = cfg.pretrained_model_dir if cfg.restart \
+        pretrained_path = SAVE_DIR.parent / cfg.pretrained_model_exp_name if cfg.restart \
             else cfg.pretrained_model_from_net_path
 
         # TODO: save dirにrestartで取ってこれるようにepochやbest scoreをjsonで保存するように実装
         # config
-        global max_length
-        global processor
+        global max_length, processor, new_tokens, pad_token_id, n_images, best_score
         max_length = cfg.max_length
         # processor
-        processor = AutoProcessor.from_pretrained(pretrained_path)
+        processor = AutoProcessor.from_pretrained(str(pretrained_path))
         processor.image_processor.size = {
             "height": cfg.img_h,
             "width": cfg.img_w,
         }
         processor.image_processor.is_vqa = False
-        global new_tokens, pad_token_id
         processor.tokenizer.add_tokens(new_tokens)
         pad_token_id = processor.tokenizer.pad_token_id
 
         # model
         model = Pix2StructForConditionalGeneration.from_pretrained(
-            pretrained_path).to(device)
+            str(pretrained_path)).to(device)
         model.decoder.resize_token_embeddings(len(processor.tokenizer))
         model.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids([
                                                                                  BOS_TOKEN])[0]
+
+        if cfg.restart:
+            with open(pretrained_path / 'best_score_info.json', 'r') as f:
+                best_score_dict = json.load(f)
+                start_epoch = best_score_dict[fold]['epoch']
+                n_images = best_score_dict[fold]['n_images']
+                best_score = best_score_dict[fold]['best_score']
+        else:
+            n_images = 0
+            start_epoch = 0
+            best_score = 0.0
+
+        print(f'load model: {str(pretrained_path)}')
+        if cfg.restart:
+            print(f'------------ Restart Learning ------------')
+        else:
+            print('------------Start Learning------------')
 
         # save
         model.save_pretrained(str(SAVE_DIR))
@@ -599,7 +702,7 @@ def main():
         scheduler = get_cosine_schedule_with_warmup(
             optimizer, num_warmup_steps=1000, num_training_steps=40000)
 
-        for epoch in range(1, cfg.n_epochs + 1):
+        for epoch in range(start_epoch, cfg.n_epochs + 1):
             train_valid_one_epoch(
                 cfg, fold, epoch, SAVE_DIR, train_loader, valid_loader, processor, model, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, indices_per_fold[fold]['gt_df'])
     wandb.finish()
