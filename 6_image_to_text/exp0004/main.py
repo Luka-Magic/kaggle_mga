@@ -494,7 +494,7 @@ def train_valid_one_epoch(
                 processor.save_pretrained(
                     str(save_dir))
                 with open(save_dir / 'best_score_info.json', 'w') as f:
-                    save_dict = {fold: {
+                    save_dict = {str(fold): {
                         'epoch': epoch,
                         'n_images': n_images,
                         'best_score': best_score
