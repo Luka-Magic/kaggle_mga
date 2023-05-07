@@ -75,8 +75,6 @@ def split_data(cfg, lmdb_dir):
         'y': [],
     }
     stratified_label = []
-    if cfg.debug:
-        n_samples = 5000
 
     for idx in tqdm(range(n_samples), total=n_samples):
         with env.begin(write=False) as txn:
@@ -106,16 +104,10 @@ def split_data(cfg, lmdb_dir):
                 in enumerate(StratifiedKFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(extracted_indices, stratified_label)):
             extracted_fold_info = {
                 k: [v[i] for i in valid_fold_indices] for k, v in extracted_info.items()}
-            if cfg.debug:
-                train_indices = [extracted_indices[i]
-                                 for i in train_fold_indices]
-                valid_indices = [extracted_indices[i]
-                                 for i in valid_fold_indices]
-            else:
-                train_indices = [extracted_indices[i]
-                                 for i in train_fold_indices] + generated_indicies
-                valid_indices = [extracted_indices[i]
-                                 for i in valid_fold_indices]
+            train_indices = [extracted_indices[i]
+                             for i in train_fold_indices] + generated_indicies
+            valid_indices = [extracted_indices[i]
+                             for i in valid_fold_indices]
             indices_dict[fold] = {
                 'train': train_indices,
                 'valid': valid_indices
