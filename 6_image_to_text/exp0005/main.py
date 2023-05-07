@@ -502,6 +502,8 @@ def train_valid_one_epoch(
                     json.dump(save_dict, f)
                 if cfg.use_wandb:
                     wandb.run.summary['best_score'] = best_score
+                gc.collect()
+                torch.cuda.empty_cache()
         if scheduler_step_time == 'epoch':
             scheduler.step()
 
@@ -699,8 +701,17 @@ def main():
         scaler = GradScaler(enabled=cfg.use_amp)
 
         # scheduelr
-        scheduler = get_cosine_schedule_with_warmup(
-            optimizer, num_warmup_steps=1000, num_training_steps=40000)
+        if cfg.scheduler == 'CosineAnnealingWarmRestarts':
+            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+                optimizer, T_0=cfg.T_0, eta_min=cfg.eta_min)
+        elif cfg.scheduler == 'OneCycleLR':
+            scheduler = optim.lr_scheduler.OneCycleLR(
+                optimizer, total_steps=cfg.n_epochs * len(train_loader), max_lr=cfg.lr, pct_start=cfg.pct_start, div_factor=cfg.div_factor, final_div_factor=cfg.final_div_factor)
+        elif cfg.scheduler == 'huggingface_schuduler':
+            scheduler = get_cosine_schedule_with_warmup(
+                optimizer, num_warmup_steps=1000, num_training_steps=40000)
+        else:
+            scheduler = None
 
         for epoch in range(start_epoch, cfg.n_epochs + 1):
             train_valid_one_epoch(

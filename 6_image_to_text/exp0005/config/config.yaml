@@ -19,15 +19,15 @@ pretrained_model_exp_name: exp0004
 
 ##### Optimizer ########################################
 optimizer: AdamW
-lr: 3e-5
+lr: 1e-4
 weight_decay: 1e-5
 
 ##### Scheduler ########################################
-# scheduler: OneCycleLR # OneCycleLR
+scheduler: OneCycleLR # OneCycleLR
 scheduler_step_time: step
-# T_0: ${n_epochs} # CAWR
-# T_mult: 1 # CAWR
-# eta_min: 1e-9 # CAWR
+T_0: ${n_epochs} # CAWR
+T_mult: 1 # CAWR
+eta_min: 1e-9 # CAWR
 
 pct_start: 0.1 # OCLR
 div_factor: 100. # OCLR
