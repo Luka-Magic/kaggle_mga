@@ -390,14 +390,12 @@ def valid_function(
             pad_token_id=processor.tokenizer.pad_token_id,
             eos_token_id=processor.tokenizer.eos_token_id,
             use_cache=True,
-            num_beams=10,
-            top_k=10,
-            top_p=0.9,
+            num_beams=2,
             bad_words_ids=[[processor.tokenizer.unk_token_id]],
             return_dict_in_generate=True
         )
 
-        outputs.extend(processor.tokenizer.batch_decode(output[0].sequences))
+        outputs.extend(processor.tokenizer.batch_decode(output.sequences))
         ids.extend(batch['id'])
         for info in batch['info']:
             table_info_list.append(info)
