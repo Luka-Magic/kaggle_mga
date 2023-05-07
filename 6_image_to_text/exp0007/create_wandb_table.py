@@ -481,11 +481,11 @@ def main():
             wandb.config = OmegaConf.to_container(
                 cfg, resolve=True, throw_on_missing=True)
             wandb.init(project=cfg.wandb_project, entity='luka-magic',
-                       name=f'{exp_name}', config=wandb.config)
+                       name=f'{exp_name.replace("exp", "valid")}', config=wandb.config)
             wandb.config.fold = fold
 
         # restart or load pretrained model from internet
-        pretrained_path = SAVE_DIR.parent / cfg.pretrained_model_exp_name
+        pretrained_path = SAVE_DIR.parent / exp_name
 
         # TODO: save dirにrestartで取ってこれるようにepochやbest scoreをjsonで保存するように実装
         # config
