@@ -707,9 +707,9 @@ def main():
         elif cfg.scheduler == 'OneCycleLR':
             scheduler = optim.lr_scheduler.OneCycleLR(
                 optimizer, total_steps=cfg.n_epochs * len(train_loader), max_lr=cfg.lr, pct_start=cfg.pct_start, div_factor=cfg.div_factor, final_div_factor=cfg.final_div_factor)
-        elif cfg.scheduler == 'huggingface_schuduler':
+        elif cfg.scheduler == 'huggingface_scheduler':
             scheduler = get_cosine_schedule_with_warmup(
-                optimizer, num_warmup_steps=1000, num_training_steps=40000)
+                optimizer, num_warmup_steps=cfg.warmup_step, num_training_steps=cfg.n_epochs * len(train_loader))
         else:
             scheduler = None
 
