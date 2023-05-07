@@ -430,12 +430,12 @@ def train_valid_one_epoch(
         pbar.set_description(
             f'[TRAIN epoch {epoch}/{cfg.n_epochs} ({valid_count_per_epoch}/{cfg.n_valid_per_epoch})]')
         pbar.set_postfix(OrderedDict(loss=train_losses.avg))
-        if cfg.use_wandb:
-            wandb.log({
-                'n_images': n_images,
-                'train_loss': loss.item(),
-                'lr': lr
-            })
+        # if cfg.use_wandb:
+        #     wandb.log({
+        #         'n_images': n_images,
+        #         'train_loss': loss.item(),
+        #         'lr': lr
+        #     })
 
         if step % (len(train_loader) // cfg.n_valid_per_epoch) == 0:
             # valid
