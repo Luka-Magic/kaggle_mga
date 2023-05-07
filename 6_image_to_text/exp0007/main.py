@@ -460,6 +460,7 @@ def train_valid_one_epoch(
                     'n_images': n_images,
                     'epoch': epoch,
                     'train_loss': train_losses.avg,
+                    'lr': lr,
                 }
                 wandb_log.update(valid_score)
                 wandb.log(
