@@ -390,19 +390,20 @@ def valid_function(
             pad_token_id=processor.tokenizer.pad_token_id,
             eos_token_id=processor.tokenizer.eos_token_id,
             use_cache=True,
-            num_beams=1,
-            top_k=1,
+            num_beams=10,
+            top_k=10,
+            top_p=0.9,
             bad_words_ids=[[processor.tokenizer.unk_token_id]],
             return_dict_in_generate=True
         )
 
-        outputs.extend(processor.tokenizer.batch_decode(output.sequences))
+        outputs.extend(processor.tokenizer.batch_decode(output[0].sequences))
         ids.extend(batch['id'])
         for info in batch['info']:
             table_info_list.append(info)
 
     scores, pred_list = validation_metrics(outputs, ids, gt_df)
-    create_wandb_table(table_info_list, pred_list, scores)
+    # create_wandb_table(table_info_list, pred_list, scores)
     return scores
 
 
