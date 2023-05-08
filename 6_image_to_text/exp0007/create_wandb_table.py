@@ -391,8 +391,7 @@ def valid_function(
             eos_token_id=processor.tokenizer.eos_token_id,
             use_cache=True,
             num_beams=1,
-            top_k=10,
-            top_p=0.92,
+            top_k=1,
             bad_words_ids=[[processor.tokenizer.unk_token_id]],
             return_dict_in_generate=True
         )
@@ -403,7 +402,7 @@ def valid_function(
             table_info_list.append(info)
 
     scores, pred_list = validation_metrics(outputs, ids, gt_df)
-    # create_wandb_table(table_info_list, pred_list, scores)
+    create_wandb_table(table_info_list, pred_list, scores)
     return scores
 
 
