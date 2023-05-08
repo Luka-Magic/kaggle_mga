@@ -390,7 +390,9 @@ def valid_function(
             pad_token_id=processor.tokenizer.pad_token_id,
             eos_token_id=processor.tokenizer.eos_token_id,
             use_cache=True,
-            num_beams=2,
+            num_beams=1,
+            top_k=10,
+            top_p=0.92,
             bad_words_ids=[[processor.tokenizer.unk_token_id]],
             return_dict_in_generate=True
         )
