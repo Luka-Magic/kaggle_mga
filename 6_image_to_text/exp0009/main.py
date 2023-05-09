@@ -153,7 +153,7 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
         train_indices = [indices[i]
                          for i in train_fold_indices]
         valid_indices = [indices[i]
-                         for i in valid_fold_indices]
+                         for i in valid_fold_indices][:100]
         gt_df = pd.DataFrame(
             index=[f"{id_}_x" for id_ in indices_info['id']] +
             [f"{id_}_y" for id_ in indices_info['id']],
