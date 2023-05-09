@@ -4,7 +4,7 @@ use_wandb: true
 wandb_project: kaggle_mga_image2text
 dataset_name: data0004
 seed: 77
-n_epochs: 5
+n_epochs: 8
 split_method: StratifiedKFold
 n_folds: 5
 use_fold: [0] # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -19,7 +19,7 @@ pretrained_model_exp_name: exp0009
 
 ##### Optimizer ########################################
 optimizer: AdamW
-lr: 1e-5
+lr: 5e-6
 weight_decay: 1e-5
 
 ##### Scheduler ########################################
@@ -33,7 +33,7 @@ pct_start: 0.1 # OCLR
 div_factor: 100. # OCLR
 final_div_factor: 1000. # OCLR
 
-warmup_step: 1000 # HS
+warmup_step: 5000 # HS
 
 ##### Image Info ########################################
 img_mean: [0.8578, 0.8552, 0.8507]
