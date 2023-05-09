@@ -4,7 +4,7 @@ use_wandb: true
 wandb_project: kaggle_mga_image2text
 dataset_name: data0004
 seed: 77
-n_epochs: 3
+n_epochs: 5
 split_method: StratifiedKFold
 n_folds: 5
 use_fold: [0] # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -13,9 +13,9 @@ use_amp: true
 n_valid_per_epoch: 5
 
 #####   Pretrained   ###################################
-restart: true
+restart: false
 pretrained_model_from_net_path: google/matcha-base
-pretrained_model_exp_name: exp0007
+pretrained_model_exp_name:
 
 ##### Optimizer ########################################
 optimizer: AdamW
