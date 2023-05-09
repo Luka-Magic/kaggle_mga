@@ -149,7 +149,7 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
         #     generated_indicies.append(idx)
 
     for fold, (train_fold_indices, valid_fold_indices) \
-            in enumerate(KFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(list(range(n_samples)), list(range(n_samples)))):
+            in enumerate(KFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(list(range(len(indices))), list(range(len(indices))))):
         train_indices = [indices[i]
                          for i in train_fold_indices]
         valid_indices = [indices[i]
