@@ -129,7 +129,7 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
             label = txn.get(label_key).decode('utf-8')
         json_dict = json.loads(label)
 
-        if json_dict['chart-type'] != 'scatter':
+        if json_dict['chart-type'] != 'scatter' or json_dict['source'] != 'generated':
             continue
         label_source = json_dict['source']
 
