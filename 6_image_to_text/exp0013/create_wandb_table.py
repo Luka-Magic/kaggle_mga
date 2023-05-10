@@ -90,7 +90,6 @@ pad_token_id = None
 best_score = 0.
 processor = None
 max_length = 1024
-max_patches = 1024
 n_images = 0
 
 # Data split
@@ -122,8 +121,6 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
         'y': [],
     }
     stratified_label = []
-    if cfg.debug:
-        n_samples = 5000
 
     for idx in tqdm(range(n_samples), total=n_samples):
         with env.begin(write=False) as txn:
@@ -149,20 +146,13 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
             generated_indicies.append(idx)
 
     if cfg.split_method == 'StratifiedKFold':
-        for fold, (train_fold_indices, valid_fold_indices) \
+        for fold, (_, valid_fold_indices) \
                 in enumerate(StratifiedKFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(extracted_indices, stratified_label)):
             extracted_fold_info = {
                 k: [v[i] for i in valid_fold_indices] for k, v in extracted_info.items()}
-            if cfg.debug:
-                train_indices = [extracted_indices[i]
-                                 for i in train_fold_indices]
-                valid_indices = [extracted_indices[i]
-                                 for i in valid_fold_indices]
-            else:
-                train_indices = [extracted_indices[i]
-                                 for i in train_fold_indices] + generated_indicies
-                valid_indices = [extracted_indices[i]
-                                 for i in valid_fold_indices]
+
+            valid_indices = [extracted_indices[i]
+                             for i in valid_fold_indices]
             gt_df = pd.DataFrame(
                 index=[f"{id_}_x" for id_ in extracted_fold_info['id']] +
                 [f"{id_}_y" for id_ in extracted_fold_info['id']],
@@ -171,7 +161,6 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
                     "chart_type": extracted_fold_info['chart_type'] * 2,
                 })
             indices_dict[fold] = {
-                'train': train_indices,
                 'valid': valid_indices,
                 'gt_df': gt_df
             }
@@ -228,6 +217,7 @@ class MgaDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict[str, Union[torch.Tensor, List[int], str]]:
         """
+
         lmdbからidに一致したimageとlabelを取り出す
 
         image
@@ -259,11 +249,19 @@ class MgaDataset(Dataset):
         buf = six.BytesIO()
         buf.write(imgbuf)
         buf.seek(0)
-        image = np.array(Image.open(buf).convert('RGB'))
-        h, w, _ = image.shape
-
-        encoding = {}
-        encoding['image_arr'] = image
+        image_arr = np.array(Image.open(buf).convert('RGB'))
+        h, w, _ = image_arr.shape
+        image = self.transforms(image=image_arr)['image']
+        h_pad, w_pad = max((w - h)//2, 0), max((h - w)//2, 0)
+        image_arr = cv2.copyMakeBorder(
+            image_arr, h_pad, h_pad, w_pad, w_pad, cv2.BORDER_CONSTANT, 0.)
+        encoding = self.processor(
+            images=image,
+            random_padding=True,
+            add_special_tokens=True,
+            max_patches=self.cfg.max_patches
+        )
+        encoding = {k: torch.from_numpy(v[0]) for k, v in encoding.items()}
 
         # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
         json_dict = json.loads(label)
@@ -275,7 +273,7 @@ class MgaDataset(Dataset):
         encoding['phase'] = self.phase
         if self.phase == 'valid':
             encoding['info'] = {
-                'img': image,
+                'img': image_arr,
                 'img_h': h,
                 'img_w': w,
                 'source': json_dict['source'],
@@ -297,16 +295,8 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
             keys: (flattened_patches, attention_mask, labels, id)
     """
 
+    batch = {"flattened_patches": [], "attention_mask": []}
     texts = [item['text'] for item in samples]
-    images = [item['image_arr'] for item in samples]
-
-    batch = processor(
-        images=images,
-        random_padding=True,
-        add_special_tokens=True,
-        max_patches=max_patches,
-        return_tensors='pt'
-    )
 
     phase = samples[0]['phase']
 
@@ -320,6 +310,12 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
         max_length=max_length
     )
     batch['labels'] = text_inputs.input_ids
+
+    for item in samples:
+        batch["flattened_patches"].append(item["flattened_patches"])
+        batch["attention_mask"].append(item["attention_mask"])
+    batch["flattened_patches"] = torch.stack(batch["flattened_patches"])
+    batch["attention_mask"] = torch.stack(batch["attention_mask"])
 
     batch["id"] = [x["id"] for x in samples]
     if phase == 'valid':
@@ -344,19 +340,9 @@ def get_transforms(cfg, phase='train'):
 # Dataloader
 
 
-def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices):
-    train_ds = MgaDataset(cfg, lmdb_dir, train_indices,
-                          processor, get_transforms(cfg, 'train'), 'train')
+def prepare_dataloader(cfg, lmdb_dir, processor, valid_indices):
     valid_ds = MgaDataset(cfg, lmdb_dir, valid_indices,
-                          processor, get_transforms(cfg, 'train'), 'valid')
-    train_loader = DataLoader(
-        train_ds,
-        batch_size=cfg.train_bs,
-        shuffle=True,
-        num_workers=cfg.num_workers,
-        pin_memory=True,
-        collate_fn=collate_fn
-    )
+                          processor, get_transforms(cfg, 'valid'), 'valid')
 
     valid_loader = DataLoader(
         valid_ds,
@@ -366,124 +352,11 @@ def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices):
         pin_memory=True,
         collate_fn=collate_fn
     )
-    return train_loader, valid_loader
-
-
-# Train function
-def train_valid_one_epoch(
-    cfg,
-    fold: int,
-    epoch: int,
-    save_dir: Path,
-    train_loader: DataLoader,
-    valid_loader: DataLoader,
-    processor: PreTrainedTokenizerBase,
-    model: PreTrainedModel,
-    device: torch.device,
-    optimizer: torch.optim.Optimizer,
-    scheduler: torch.optim.lr_scheduler,
-    scheduler_step_time: str,
-    scaler: torch.cuda.amp.GradScaler,
-    gt_df: pd.DataFrame
-):
-    global best_score, n_images
-
-    model.train()
-
-    train_losses = AverageMeter()
-    pbar = tqdm(enumerate(train_loader), total=len(train_loader))
-
-    valid_count_per_epoch = 0
-
-    # train & valid
-    for step, batch in pbar:
-        step += 1
-        flattened_patches = batch['flattened_patches'].to(device)
-        attention_mask = batch['attention_mask'].to(device)
-        labels = batch["labels"].to(device)
-        bs = len(flattened_patches)
-        n_images += bs
-
-        with autocast(enabled=cfg.use_amp):
-            output = model(
-                flattened_patches=flattened_patches,
-                attention_mask=attention_mask,
-                labels=labels
-            )
-            loss = output.loss
-
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
-        optimizer.zero_grad(set_to_none=True)
-
-        train_losses.update(loss.item(), bs)
-        lr = get_lr(optimizer)
-        if scheduler_step_time == 'step':
-            scheduler.step()
-        pbar.set_description(
-            f'[TRAIN epoch {epoch}/{cfg.n_epochs} ({valid_count_per_epoch}/{cfg.n_valid_per_epoch})]')
-        pbar.set_postfix(OrderedDict(loss=train_losses.avg))
-        # if cfg.use_wandb:
-        #     wandb.log({
-        #         'n_images': n_images,
-        #         'train_loss': loss.item(),
-        #         'lr': lr
-        #     })
-
-        if step % (len(train_loader) // cfg.n_valid_per_epoch) == 0:
-            # valid
-            valid_score = valid_function(cfg, epoch, valid_loader,
-                                         processor, model, device, gt_df)
-            model.train()
-            valid_count_per_epoch += 1
-            print("\n" + "=" * 80)
-            print(
-                f'Fold {fold} | Epoch {epoch}/{cfg.n_epochs} ({valid_count_per_epoch}/{cfg.n_valid_per_epoch})')
-            print(f'    TRAIN:')
-            print(f'            loss: {train_losses.avg:.6f}')
-            print(f'    VALID:')
-            for valid_score_name, valid_score_value in valid_score.items():
-                print(
-                    f'            {valid_score_name}: {valid_score_value:.6f}')
-            print("=" * 80)
-
-            # log
-            if cfg.use_wandb:
-                wandb_log = {
-                    'n_images': n_images,
-                    'epoch': epoch,
-                    'train_loss': train_losses.avg,
-                    'lr': lr,
-                }
-                wandb_log.update(valid_score)
-                wandb.log(
-                    wandb_log
-                )
-            # save model
-            if valid_score['valid_score'] > best_score:
-                best_score = valid_score['valid_score']
-                model.save_pretrained(str(save_dir))
-                processor.save_pretrained(
-                    str(save_dir))
-                with open(save_dir / 'best_score_info.json', 'w') as f:
-                    save_dict = {str(fold): {
-                        'epoch': epoch,
-                        'n_images': n_images,
-                        'best_score': best_score
-                    }}
-                    json.dump(save_dict, f)
-                if cfg.use_wandb:
-                    wandb.run.summary['best_score'] = best_score
-                gc.collect()
-                torch.cuda.empty_cache()
-        if scheduler_step_time == 'epoch':
-            scheduler.step()
+    return valid_loader
 
 
 def valid_function(
     cfg,
-    epoch: int,
     dataloader: DataLoader,
     processor: PreTrainedTokenizerBase,
     model: PreTrainedModel,
@@ -498,7 +371,7 @@ def valid_function(
     ids = []
     table_info_list = []
 
-    for step, batch in enumerate(dataloader):
+    for _, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
         flattened_patches = batch['flattened_patches'].to(device)
         attention_mask = batch['attention_mask'].to(device)
         bs = len(flattened_patches)
@@ -529,7 +402,7 @@ def valid_function(
             table_info_list.append(info)
 
     scores, pred_list = validation_metrics(outputs, ids, gt_df)
-    # create_wandb_table(table_info_list, pred_list, scores)
+    create_wandb_table(table_info_list, pred_list, scores)
     return scores
 
 
@@ -576,7 +449,6 @@ def create_wandb_table(
             scores['valid_score']  # valid_score
         ]
         wandb_data.append(data_list)
-    print(wandb_data)
 
     wandb_table = wandb.Table(columns=wandb_columns, data=wandb_data)
     wandb.log({'valid result': wandb_table})
@@ -609,18 +481,16 @@ def main():
             wandb.config = OmegaConf.to_container(
                 cfg, resolve=True, throw_on_missing=True)
             wandb.init(project=cfg.wandb_project, entity='luka-magic',
-                       name=f'{exp_name}', config=wandb.config)
+                       name=f'{exp_name.replace("exp", "valid")}', config=wandb.config)
             wandb.config.fold = fold
 
         # restart or load pretrained model from internet
-        pretrained_path = SAVE_DIR.parent / cfg.pretrained_model_exp_name if cfg.restart \
-            else cfg.pretrained_model_from_net_path
+        pretrained_path = SAVE_DIR.parent / exp_name
 
         # TODO: save dirにrestartで取ってこれるようにepochやbest scoreをjsonで保存するように実装
         # config
-        global max_length, max_patches, processor, new_tokens, pad_token_id, n_images, best_score
+        global max_length, processor, new_tokens, pad_token_id, n_images, best_score
         max_length = cfg.max_length
-        max_patches = cfg.max_patches
         # processor
         processor = AutoProcessor.from_pretrained(str(pretrained_path))
         processor.image_processor.size = {
@@ -638,58 +508,28 @@ def main():
         model.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids([
                                                                                  BOS_TOKEN])[0]
 
-        if cfg.restart:
-            with open(pretrained_path / 'best_score_info.json', 'r') as f:
-                best_score_dict = json.load(f)
-                start_epoch = best_score_dict[str(fold)]['epoch']
-                n_images = best_score_dict[str(fold)]['n_images']
-                best_score = best_score_dict[str(fold)]['best_score']
-        else:
-            n_images = 0
-            start_epoch = 1
-            best_score = 0.0
+        # learning info
+        with open(pretrained_path / 'best_score_info.json', 'r') as f:
+            best_score_dict = json.load(f)
+            n_images = best_score_dict[str(fold)]['n_images']
 
         print(f'load model: {str(pretrained_path)}')
-        if cfg.restart:
-            print(f'------------ Restart Learning ------------')
-        else:
-            print('------------Start Learning------------')
 
-        # save
-        model.save_pretrained(str(SAVE_DIR))
-        processor.save_pretrained(
-            str(SAVE_DIR))
+        # data indices
+        valid_indices = indices_per_fold[fold]['valid']
 
-        # data
-        train_indices, valid_indices = indices_per_fold[fold]['train'], indices_per_fold[fold]['valid']
-        train_loader, valid_loader = prepare_dataloader(
-            cfg, LMDB_DIR, processor, train_indices, valid_indices)
+        # dataloader
+        valid_loader = prepare_dataloader(
+            cfg, LMDB_DIR, processor, valid_indices)
 
-        # optimizer
-        optimizer = Adafactor(model.parameters(
-        ), scale_parameter=False, relative_step=False, lr=cfg.lr, weight_decay=cfg.weight_decay)
-
-        # scaler
-        scaler = GradScaler(enabled=cfg.use_amp)
-
-        # scheduelr
-        if cfg.scheduler == 'CosineAnnealingWarmRestarts':
-            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
-                optimizer, T_0=cfg.T_0, eta_min=cfg.eta_min)
-        elif cfg.scheduler == 'OneCycleLR':
-            scheduler = optim.lr_scheduler.OneCycleLR(
-                optimizer, total_steps=cfg.n_epochs * len(train_loader), max_lr=cfg.lr, pct_start=cfg.pct_start, div_factor=cfg.div_factor, final_div_factor=cfg.final_div_factor)
-        elif cfg.scheduler == 'huggingface_scheduler':
-            scheduler = get_cosine_schedule_with_warmup(
-                optimizer, num_warmup_steps=cfg.warmup_step, num_training_steps=cfg.n_epochs * len(train_loader))
-        else:
-            scheduler = None
-
-        for epoch in range(start_epoch, cfg.n_epochs + 1):
-            train_valid_one_epoch(
-                cfg, fold, epoch, SAVE_DIR, train_loader, valid_loader, processor, model, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, indices_per_fold[fold]['gt_df'])
+        valid_score = valid_function(
+            cfg, valid_loader, processor, model, device, indices_per_fold[fold]['gt_df'])
+        print(f'    VALID:')
+        for valid_score_name, valid_score_value in valid_score.items():
+            print(
+                f'            {valid_score_name}: {valid_score_value:.6f}')
     wandb.finish()
-    del model, processor, config, train_loader, valid_loader, train_indices, valid_indices, optimizer, scaler
+    del model, processor, valid_loader, valid_indices
 
 
 if __name__ == '__main__':

@@ -419,7 +419,7 @@ def train_valid_one_epoch(
 
         train_losses.update(loss.item(), bs)
         lr = get_lr(optimizer)
-        if scheduler_step_time == 'step':
+        if scheduler is not None and scheduler_step_time == 'step':
             scheduler.step()
         pbar.set_description(
             f'[TRAIN epoch {epoch}/{cfg.n_epochs} ({valid_count_per_epoch}/{cfg.n_valid_per_epoch})]')
@@ -477,7 +477,7 @@ def train_valid_one_epoch(
                     wandb.run.summary['best_score'] = best_score
                 gc.collect()
                 torch.cuda.empty_cache()
-        if scheduler_step_time == 'epoch':
+        if scheduler is not None and scheduler_step_time == 'epoch':
             scheduler.step()
 
 
@@ -512,6 +512,7 @@ def valid_function(
             flattened_patches=flattened_patches,
             attention_mask=attention_mask,
             decoder_input_ids=decoder_input_ids,
+            max_new_token=cfg.max_new_token,
             max_length=cfg.max_length,
             early_stopping=True,
             pad_token_id=processor.tokenizer.pad_token_id,
