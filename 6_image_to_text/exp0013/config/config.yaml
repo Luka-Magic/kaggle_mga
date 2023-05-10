@@ -25,7 +25,7 @@ lr: 3e-5
 weight_decay: 0
 
 ##### Scheduler ######################################
-scheduler: huggingface_scheduler # OneCycleLR
+scheduler: # OneCycleLR, huggingface_scheduler
 scheduler_step_time: step
 T_0: ${n_epochs} # CAWR
 T_mult: 1 # CAWR
