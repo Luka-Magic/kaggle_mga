@@ -512,7 +512,7 @@ def valid_function(
             flattened_patches=flattened_patches,
             attention_mask=attention_mask,
             decoder_input_ids=decoder_input_ids,
-            max_new_token=cfg.max_new_token,
+            max_new_tokens=cfg.max_new_tokens,
             max_length=cfg.max_length,
             early_stopping=True,
             pad_token_id=processor.tokenizer.pad_token_id,

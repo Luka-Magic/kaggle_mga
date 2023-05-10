@@ -17,7 +17,7 @@ restart: false
 pretrained_model_from_net_path: google/matcha-base
 pretrained_model_exp_name:
 
-max_new_token: 512
+max_new_tokens: 512
 
 ##### Optimizer ######################################
 optimizer: AdamW
