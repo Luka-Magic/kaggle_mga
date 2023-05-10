@@ -638,17 +638,6 @@ def main():
         model.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids([
                                                                                  BOS_TOKEN])[0]
 
-        if cfg.restart:
-            with open(pretrained_path / 'best_score_info.json', 'r') as f:
-                best_score_dict = json.load(f)
-                start_epoch = best_score_dict[str(fold)]['epoch']
-                n_images = best_score_dict[str(fold)]['n_images']
-                best_score = best_score_dict[str(fold)]['best_score']
-        else:
-            n_images = 0
-            start_epoch = 1
-            best_score = 0.0
-
         print(f'load model: {str(pretrained_path)}')
         if cfg.restart:
             print(f'------------ Restart Learning ------------')
@@ -684,6 +673,26 @@ def main():
                 optimizer, num_warmup_steps=cfg.warmup_step, num_training_steps=cfg.n_epochs * len(train_loader))
         else:
             scheduler = None
+
+        if cfg.restart:
+            with open(pretrained_path / 'best_score_info.json', 'r') as f:
+                best_score_dict = json.load(f)
+                start_epoch = best_score_dict[str(fold)]['epoch']
+                n_images = best_score_dict[str(fold)]['n_images']
+                best_score = best_score_dict[str(fold)]['best_score']
+
+            if scheduler is not None:
+                for _ in range(1, start_epoch):
+                    if cfg.scheduler_step_time == 'step':
+                        for _ in range(len(train_loader)):
+                            scheduler.step()
+                    elif cfg.scheduler_step_time == 'epoch':
+                        scheduler.step()
+                print(f'lr start from: {get_lr(optimizer)}')
+        else:
+            n_images = 0
+            start_epoch = 1
+            best_score = 0.0
 
         for epoch in range(start_epoch, cfg.n_epochs + 1):
             train_valid_one_epoch(
