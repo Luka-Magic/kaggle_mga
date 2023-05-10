@@ -314,10 +314,11 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
         add_special_tokens=True,
         max_patches=max_patches
     )
-    print(type(batch))
-    print(len(batch['flattened_patches']))
-    print(batch['flattened_patches'][0].shape)
+    # print(type(batch))
+    # print(len(batch['flattened_patches']))
+    # print(batch['flattened_patches'][0].shape)
     # encoding = {k: torch.from_numpy(v[0]) for k, v in encoding.items()}
+    batch = {k: torch.stack(v) for k, v in batch.items()}
     phase = samples[0]['phase']
 
     # Make a multiple of 8 to efficiently use the tensor cores
