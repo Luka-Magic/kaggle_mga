@@ -1,6 +1,6 @@
 #####   BASIC   ######################################
-debug: true
-use_wandb: false
+debug: false
+use_wandb: true
 wandb_project: kaggle_mga_image2text
 dataset_name: data0004
 seed: 77
@@ -16,7 +16,6 @@ n_valid_per_epoch: 5
 restart: false
 pretrained_model_from_net_path: google/matcha-base
 pretrained_model_exp_name:
-
 max_new_tokens: 512
 
 ##### Optimizer ######################################

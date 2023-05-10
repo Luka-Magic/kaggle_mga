@@ -513,13 +513,9 @@ def valid_function(
             attention_mask=attention_mask,
             decoder_input_ids=decoder_input_ids,
             max_new_tokens=cfg.max_new_tokens,
-            max_length=cfg.max_length,
-            early_stopping=True,
             pad_token_id=processor.tokenizer.pad_token_id,
             eos_token_id=processor.tokenizer.eos_token_id,
             use_cache=True,
-            num_beams=1,
-            top_k=1,
             bad_words_ids=[[processor.tokenizer.unk_token_id]],
             return_dict_in_generate=True
         )
