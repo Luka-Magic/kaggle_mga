@@ -315,7 +315,8 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
         max_patches=max_patches
     )
     print(type(batch))
-    print(batch['flattened_patches'].shape)
+    print(len(batch['flattened_patches']))
+    print(batch['flattened_patches'][0].shape)
     # encoding = {k: torch.from_numpy(v[0]) for k, v in encoding.items()}
     phase = samples[0]['phase']
 
