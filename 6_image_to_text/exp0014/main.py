@@ -618,7 +618,7 @@ def main():
         max_length = cfg.max_length
         max_patches = cfg.max_patches
         # processor
-        processor = AutoProcessor.from_pretrained(str(pretrained_path))
+        processor = AutoProcessor.from_pretrained(str('google/matcha-base'))
         processor.image_processor.size = {
             "height": cfg.img_h,
             "width": cfg.img_w,
