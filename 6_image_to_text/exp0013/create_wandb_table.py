@@ -174,12 +174,10 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
 
 # Dataset
 class MgaDataset(Dataset):
-    def __init__(self, cfg, lmdb_dir, indices, processor, transforms, phase):
+    def __init__(self, cfg, lmdb_dir, indices, processor):
         self.cfg = cfg
         self.indices = indices
         self.processor = processor
-        self.phase = phase
-        self.transforms = transforms
         self.env = lmdb.open(str(lmdb_dir), max_readers=32,
                              readonly=True, lock=False, readahead=False, meminit=False)
 
