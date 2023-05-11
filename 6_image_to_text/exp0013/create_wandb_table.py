@@ -124,6 +124,9 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
     }
     stratified_label = []
 
+    if cfg.debug:
+        n_samples = 5000
+
     for idx in tqdm(range(n_samples), total=n_samples):
         with env.begin(write=False) as txn:
             # load json
@@ -393,8 +396,8 @@ def valid_function(
         )
 
         output = model.generate(
-            flattened_patches=flattened_patches,
-            attention_mask=attention_mask,
+            flattened_patches=flattened_patches.squeeze(),
+            attention_mask=attention_mask.squeeze(),
             decoder_input_ids=decoder_input_ids,
             max_new_tokens=cfg.max_new_tokens,
             pad_token_id=processor.tokenizer.pad_token_id,
@@ -482,6 +485,7 @@ def main():
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
     seed_everything(cfg.seed)
+    cfg.debug = True
 
     # if cfg.use_wandb:
     #     wandb.login()
