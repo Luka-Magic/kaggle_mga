@@ -259,7 +259,7 @@ class MgaDataset(Dataset):
             max_patches=max_patches,
             return_tensors='pt'
         )
-        encoding = {k: v[0] for k, v in encoding.items()}
+        encoding = {k: v[0].squeeze() for k, v in encoding.items()}
         print(encoding)
 
         # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
