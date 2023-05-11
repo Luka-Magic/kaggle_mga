@@ -387,7 +387,7 @@ def valid_function(
         flattened_patches = item['flattened_patches'].to(device)
         attention_mask = item['attention_mask'].to(device)
         decoder_input_ids = torch.full(
-            (1),
+            (1, 1),
             model.config.decoder_start_token_id,
             device=device,
         )
