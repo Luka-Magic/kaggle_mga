@@ -254,32 +254,15 @@ class MgaDataset(Dataset):
         image = np.array(Image.open(buf).convert('RGB'))
         h, w, _ = image.shape
 
-        encoding = processor(
-            images=image,
-            random_padding=True,
-            add_special_tokens=True,
-            max_patches=max_patches,
-            return_tensors='pt'
-        )
-        encoding = {k: v[0] for k, v in encoding.items()}
-        print(encoding)
+        encoding = {}
+        encoding['image_arr'] = image
 
         # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
         json_dict = json.loads(label)
 
         gt_string, x_list, y_list = self._json_dict_to_gt_string(json_dict)
 
-        text_inputs = processor(
-            text=gt_string,
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt",
-            add_special_tokens=True,
-            max_length=max_length
-        )[0].input_ids
-
         encoding['text'] = gt_string
-        encoding['labels'] = text_inputs
         encoding['id'] = json_dict['id']
         encoding['phase'] = self.phase
         if self.phase == 'valid':
@@ -299,41 +282,41 @@ class MgaDataset(Dataset):
 # Collate_fn
 
 
-# def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) -> Dict[str, Union[torch.Tensor, List[str]]]:
-#     """
-#     Returns:
-#         batch (dict):
-#             keys: (flattened_patches, attention_mask, labels, id)
-#     """
+def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) -> Dict[str, Union[torch.Tensor, List[str]]]:
+    """
+    Returns:
+        batch (dict):
+            keys: (flattened_patches, attention_mask, labels, id)
+    """
 
-#     texts = [item['text'] for item in samples]
-#     images = [item['image_arr'] for item in samples]
+    texts = [item['text'] for item in samples]
+    images = [item['image_arr'] for item in samples]
 
-#     batch = processor(
-#         images=images,
-#         random_padding=True,
-#         add_special_tokens=True,
-#         max_patches=max_patches,
-#         return_tensors='pt'
-#     )
+    batch = processor(
+        images=images,
+        random_padding=True,
+        add_special_tokens=True,
+        max_patches=max_patches,
+        return_tensors='pt'
+    )
 
-#     phase = samples[0]['phase']
+    phase = samples[0]['phase']
 
-#     # Make a multiple of 8 to efficiently use the tensor cores
-#     text_inputs = processor(
-#         text=texts,
-#         padding="max_length",
-#         truncation=True,
-#         return_tensors="pt",
-#         add_special_tokens=True,
-#         max_length=max_length
-#     )
-#     batch['labels'] = text_inputs.input_ids
+    # Make a multiple of 8 to efficiently use the tensor cores
+    text_inputs = processor(
+        text=texts,
+        padding="max_length",
+        truncation=True,
+        return_tensors="pt",
+        add_special_tokens=True,
+        max_length=max_length
+    )
+    batch['labels'] = text_inputs.input_ids
 
-#     batch["id"] = [x["id"] for x in samples]
-#     if phase == 'valid':
-#         batch['info'] = [x['info'] for x in samples]
-#     return batch
+    batch["id"] = [x["id"] for x in samples]
+    if phase == 'valid':
+        batch['info'] = [x['info'] for x in samples]
+    return batch
 
 
 def get_transforms(cfg, phase='train'):
@@ -353,24 +336,24 @@ def get_transforms(cfg, phase='train'):
 # Dataloader
 
 
-# def prepare_dataloader(cfg, lmdb_dir, processor, valid_indices):
-#     valid_ds = MgaDataset(cfg, lmdb_dir, valid_indices,
-#                           processor, get_transforms(cfg, 'valid'), 'valid')
+def prepare_dataloader(cfg, lmdb_dir, processor, valid_indices):
+    valid_ds = MgaDataset(cfg, lmdb_dir, valid_indices,
+                          processor, get_transforms(cfg, 'valid'), 'valid')
 
-#     valid_loader = DataLoader(
-#         valid_ds,
-#         batch_size=cfg.valid_bs,
-#         shuffle=False,
-#         num_workers=cfg.num_workers,
-#         pin_memory=True,
-#         collate_fn=collate_fn
-#     )
-#     return valid_loader
+    valid_loader = DataLoader(
+        valid_ds,
+        batch_size=cfg.valid_bs,
+        shuffle=False,
+        num_workers=cfg.num_workers,
+        pin_memory=True,
+        collate_fn=collate_fn
+    )
+    return valid_loader
 
 
 def valid_function(
     cfg,
-    dataset: Dataset,
+    dataloader: DataLoader,
     processor: PreTrainedTokenizerBase,
     model: PreTrainedModel,
     device: torch.device,
@@ -385,12 +368,12 @@ def valid_function(
     ids = []
     table_info_list = []
 
-    # n_samples = len(dataset)
-    for step, item in tqdm(enumerate(dataset), total=len(dataset)):
-        flattened_patches = item['flattened_patches'].to(device)
-        attention_mask = item['attention_mask'].to(device)
+    for step, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
+        flattened_patches = batch['flattened_patches'].to(device)
+        attention_mask = batch['attention_mask'].to(device)
+        bs = len(flattened_patches)
         decoder_input_ids = torch.full(
-            (1),
+            (bs, 1),
             model.config.decoder_start_token_id,
             device=device,
         )
@@ -407,9 +390,9 @@ def valid_function(
             return_dict_in_generate=True
         )
 
-        outputs.append(processor.tokenizer.batch_decode(output.sequences))
-        ids.append(item['id'])
-        for info in item['info']:
+        outputs.extend(processor.tokenizer.batch_decode(output.sequences))
+        ids.extend(batch['id'])
+        for info in batch['info']:
             table_info_list.append(info)
 
         if step == 0:
@@ -418,7 +401,7 @@ def valid_function(
     scores, pred_list = validation_metrics(outputs, ids, gt_df)
     finish_time = time.time()
     scores['valid_time'] = f'{(finish_time - start_time):.1f}s'
-    create_wandb_table(table_info_list, pred_list, scores)/
+    create_wandb_table(table_info_list, pred_list, scores)
     return scores
 
 
@@ -486,19 +469,19 @@ def main():
 
     seed_everything(cfg.seed)
 
-    # if cfg.use_wandb:
-    #     wandb.login()
+    if cfg.use_wandb:
+        wandb.login()
 
     device = torch.device('cuda') if torch.cuda.is_available() else 'cpu'
     indices_per_fold = split_data(cfg, LMDB_DIR)
 
     for fold in cfg.use_fold:
-        # if cfg.use_wandb:
-        #     wandb.config = OmegaConf.to_container(
-        #         cfg, resolve=True, throw_on_missing=True)
-        #     wandb.init(project=cfg.wandb_project, entity='luka-magic',
-        #                name=f'{exp_name.replace("exp", "valid")}', config=wandb.config)
-        #     wandb.config.fold = fold
+        if cfg.use_wandb:
+            wandb.config = OmegaConf.to_container(
+                cfg, resolve=True, throw_on_missing=True)
+            wandb.init(project=cfg.wandb_project, entity='luka-magic',
+                       name=f'{exp_name.replace("exp", "valid")}', config=wandb.config)
+            wandb.config.fold = fold
 
         # restart or load pretrained model from internet
         pretrained_path = SAVE_DIR.parent / exp_name
@@ -536,18 +519,16 @@ def main():
         valid_indices = indices_per_fold[fold]['valid']
 
         # dataloader
-        # valid_loader = prepare_dataloader(
-        #     cfg, LMDB_DIR, processor, valid_indices)
-        valid_ds = MgaDataset(
-            cfg, LMDB_DIR, valid_indices, processor)
+        valid_loader = prepare_dataloader(
+            cfg, LMDB_DIR, processor, valid_indices)
 
         valid_score = valid_function(
-            cfg, valid_ds, processor, model, device, indices_per_fold[fold]['gt_df'])
+            cfg, valid_loader, processor, model, device, indices_per_fold[fold]['gt_df'])
         print(f'    VALID:')
         for valid_score_name, valid_score_value in valid_score.items():
             print(
                 f'            {valid_score_name}: {valid_score_value:.6f}')
-    # wandb.finish()
+    wandb.finish()
     del model, processor, valid_loader, valid_indices
 
 
