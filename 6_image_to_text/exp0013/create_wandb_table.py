@@ -274,7 +274,7 @@ class MgaDataset(Dataset):
             return_tensors="pt",
             add_special_tokens=True,
             max_length=max_length
-        )[0].input_ids
+        ).input_ids
 
         encoding['text'] = gt_string
         encoding['labels'] = text_inputs
