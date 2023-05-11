@@ -15,7 +15,7 @@ n_valid_per_epoch: 5
 #####   Model   ######################################
 restart: start
 pretrained_model_from_net_path: google/matcha-base
-pretrained_model_exp_name:
+pretrained_model_exp_name: exp0013
 max_new_tokens: 512
 
 ##### Optimizer ######################################
