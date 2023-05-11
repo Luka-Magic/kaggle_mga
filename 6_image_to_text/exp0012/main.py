@@ -698,6 +698,7 @@ def main():
                                 scheduler.step()
                         if cfg.scheduler_step_time == 'epoch':
                             scheduler.step()
+                del count
                 print(f' complete setting lr: {get_lr(optimizer)}')
         else:
             n_images = 0
