@@ -692,8 +692,8 @@ def main():
                 count = 0
                 while count < n_images:
                     for _ in range(1, cfg.n_epochs):
-                        for bs in train_loader:
-                            count += len(bs['id'])
+                        for bs in range(len(train_loader)):
+                            count += cfg.train_bs
                             if cfg.scheduler_step_time == 'step':
                                 scheduler.step()
                         if cfg.scheduler_step_time == 'epoch':
