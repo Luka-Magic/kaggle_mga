@@ -681,23 +681,11 @@ def main():
                 n_images = best_score_dict[str(fold)]['n_images']
                 best_score = best_score_dict[str(fold)]['best_score']
             if scheduler is not None:
-                # for _ in range(1, start_epoch):
-                #     if cfg.scheduler_step_time == 'step':
-                #         for _ in range(len(train_loader)):
-                #             scheduler.step()
-                #     elif cfg.scheduler_step_time == 'epoch':
-                #         scheduler.step()
-                # print(f'lr start from: {get_lr(optimizer)}')
                 print(' set lr...')
-                count = 0
-                while count < n_images:
-                    for _ in range(1, cfg.n_epochs):
-                        for bs in range(len(train_loader)):
-                            count += cfg.train_bs
-                            if cfg.scheduler_step_time == 'step':
-                                scheduler.step()
-                        if cfg.scheduler_step_time == 'epoch':
-                            scheduler.step()
+                n_steps = n_images // cfg.train_bs
+                for _ in range(n_steps):
+                    if cfg.scheduler_step_time == 'step':
+                        scheduler.step()
                 del count
                 print(f' complete setting lr: {get_lr(optimizer)}')
         else:
