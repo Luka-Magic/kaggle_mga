@@ -403,7 +403,6 @@ def train_valid_one_epoch(
         labels = batch["labels"].to(device)
         bs = len(flattened_patches)
         n_images += bs
-
         with autocast(enabled=cfg.use_amp):
             output = model(
                 flattened_patches=flattened_patches,
