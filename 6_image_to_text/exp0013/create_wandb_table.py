@@ -279,19 +279,18 @@ class MgaDataset(Dataset):
         encoding['text'] = gt_string
         encoding['labels'] = text_inputs
         encoding['id'] = json_dict['id']
-        encoding['phase'] = self.phase
-        if self.phase == 'valid':
-            encoding['info'] = {
-                'img': image,
-                'img_h': h,
-                'img_w': w,
-                'source': json_dict['source'],
-                'x_tick_type': json_dict['axes']['x-axis']['tick-type'],
-                'y_tick_type': json_dict['axes']['y-axis']['tick-type'],
-                'gt_x': x_list,
-                'gt_y': y_list,
-                'chart_type': json_dict['chart-type']
-            }
+        # encoding['phase'] = self.phase
+        encoding['info'] = {
+            'img': image,
+            'img_h': h,
+            'img_w': w,
+            'source': json_dict['source'],
+            'x_tick_type': json_dict['axes']['x-axis']['tick-type'],
+            'y_tick_type': json_dict['axes']['y-axis']['tick-type'],
+            'gt_x': x_list,
+            'gt_y': y_list,
+            'chart_type': json_dict['chart-type']
+        }
         return encoding
 
 # Collate_fn
@@ -334,19 +333,19 @@ class MgaDataset(Dataset):
 #     return batch
 
 
-def get_transforms(cfg, phase='train'):
-    if phase == 'train':
-        return A.Compose([
-            A.Resize(height=cfg.img_h, width=cfg.img_w),
-            A.Normalize(cfg.img_mean, cfg.img_std),
-            ToTensorV2()
-        ])
-    elif phase == 'valid':
-        return A.Compose([
-            A.Resize(height=cfg.img_h, width=cfg.img_w),
-            A.Normalize(cfg.img_mean, cfg.img_std),
-            ToTensorV2()
-        ])
+# def get_transforms(cfg, phase='train'):
+#     if phase == 'train':
+#         return A.Compose([
+#             A.Resize(height=cfg.img_h, width=cfg.img_w),
+#             A.Normalize(cfg.img_mean, cfg.img_std),
+#             ToTensorV2()
+#         ])
+#     elif phase == 'valid':
+#         return A.Compose([
+#             A.Resize(height=cfg.img_h, width=cfg.img_w),
+#             A.Normalize(cfg.img_mean, cfg.img_std),
+#             ToTensorV2()
+#         ])
 
 # Dataloader
 
