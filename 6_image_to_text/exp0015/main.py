@@ -322,11 +322,11 @@ class MgaDataset(Dataset):
 
         if self.phase == 'train':
             if json_dict['source'] == 'generated':
-                image = self.transforms_gen(image_arr)['image']
+                image = self.transforms_gen(image=image_arr)['image']
             elif json_dict['source'] == 'extracted':
-                image = self.transforms_ext(image_arr)['image']
+                image = self.transforms_ext(image=image_arr)['image']
         else:
-            image = self.transforms(image_arr)['image']
+            image = self.transforms(image=image_arr)['image']
         encoding = {}
         encoding['image_tensor'] = image_arr
 
