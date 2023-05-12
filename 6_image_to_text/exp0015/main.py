@@ -241,7 +241,7 @@ class MgaDataset(Dataset):
             self.transforms_gen = get_transforms(cfg, mode='generated')
             self.transforms_ext = get_transforms(cfg, mode='extracted')
         elif phase == 'valid':
-            self.transforms = get_transforms(mode='valid')
+            self.transforms = get_transforms(cfg, mode='valid')
 
         self.phase = phase
         self.env = lmdb.open(str(lmdb_dir), max_readers=32,
