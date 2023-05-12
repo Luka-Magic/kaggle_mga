@@ -181,12 +181,68 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
     return indices_dict
 
 
+def get_transforms(cfg, mode='generated'):
+    if mode == 'generated':
+        return A.Compose([
+            # 色彩変換
+            A.OneOf([
+                A.ChannelShuffle(p=1.),  # RGBの並び替え,
+                A.RandomGamma((30, 180), p=1.),
+                A.RandomBrightnessContrast(
+                    brightness_limit=(-0.05, 0.2),
+                    contrast_limit=(-0.05, 0.2),
+                    p=1.),
+            ], p=0.3),
+
+            # gray scale
+            A.ToGray(p=0.1),
+
+            # 低画質化
+            A.OneOf([
+                A.GaussianBlur(
+                    blur_limit=(3, 5),
+                    sigma_limit=0.7,
+                    p=1.),
+                A.GaussianBlur(
+                    blur_limit=(3, 5),
+                    sigma_limit=0.7,
+                    p=1.),
+                A.GaussNoise(mean=30, p=1.),
+                A.JpegCompression(quality_lower=50, quality_upper=100, p=1.),
+                A.Downscale(scale_min=0.75, scale_max=0.99, p=1.),
+            ], p=0.3),
+
+            A.Resize(height=cfg.img_h, width=cfg.img_w),
+            A.Normalize(cfg.img_mean, cfg.img_std),
+            ToTensorV2()
+        ])
+    elif mode == 'extracted':
+        return A.Compose([
+            A.Resize(height=cfg.img_h, width=cfg.img_w),
+            A.Normalize(cfg.img_mean, cfg.img_std),
+            ToTensorV2()
+        ])
+
+    elif mode == 'valid':
+        return A.Compose([
+            A.Resize(height=cfg.img_h, width=cfg.img_w),
+            A.Normalize(cfg.img_mean, cfg.img_std),
+            ToTensorV2()
+        ])
+
+
 # Dataset
 class MgaDataset(Dataset):
     def __init__(self, cfg, lmdb_dir, indices, processor, phase):
         self.cfg = cfg
         self.indices = indices
         self.processor = processor
+        if phase == 'train':
+            self.transforms_gen = get_transforms(mode='generated')
+            self.transforms_ext = get_transforms(mode='extracted')
+        elif phase == 'valid':
+            self.transforms = get_transforms(mode='valid')
+
         self.phase = phase
         self.env = lmdb.open(str(lmdb_dir), max_readers=32,
                              readonly=True, lock=False, readahead=False, meminit=False)
@@ -254,18 +310,25 @@ class MgaDataset(Dataset):
             label_key = f'label-{str(idx+1).zfill(8)}'.encode()
             label = txn.get(label_key).decode('utf-8')
 
+        # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
+        json_dict = json.loads(label)
+
         # image
         buf = six.BytesIO()
         buf.write(imgbuf)
         buf.seek(0)
-        image = np.array(Image.open(buf).convert('RGB'))
-        h, w, _ = image.shape
+        image_arr = np.array(Image.open(buf).convert('RGB'))
+        h, w, _ = image_arr.shape
 
+        if self.phase == 'train':
+            if json_dict['source'] == 'generated':
+                image = self.transforms_gen(image_arr)['image']
+            elif json_dict['source'] == 'extracted':
+                image = self.transforms_ext(image_arr)['image']
+        else:
+            image = self.transforms(image_arr)['image']
         encoding = {}
-        encoding['image_arr'] = image
-
-        # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
-        json_dict = json.loads(label)
+        encoding['image_tensor'] = image_arr
 
         gt_string, x_list, y_list = self._json_dict_to_gt_string(json_dict)
 
@@ -297,7 +360,7 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
     """
 
     texts = [item['text'] for item in samples]
-    images = [item['image_arr'] for item in samples]
+    images = [item['image_tensor'] for item in samples]
 
     batch = processor(
         images=images,
@@ -324,6 +387,7 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
     if phase == 'valid':
         batch['info'] = [x['info'] for x in samples]
     return batch
+
 
 # Dataloader
 
