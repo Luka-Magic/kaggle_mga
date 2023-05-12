@@ -238,8 +238,8 @@ class MgaDataset(Dataset):
         self.indices = indices
         self.processor = processor
         if phase == 'train':
-            self.transforms_gen = get_transforms(mode='generated')
-            self.transforms_ext = get_transforms(mode='extracted')
+            self.transforms_gen = get_transforms(cfg, mode='generated')
+            self.transforms_ext = get_transforms(cfg, mode='extracted')
         elif phase == 'valid':
             self.transforms = get_transforms(mode='valid')
 
