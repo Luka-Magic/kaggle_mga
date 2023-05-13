@@ -213,7 +213,7 @@ class MgaDataset(Dataset):
         chart_type = f"<{json_dict['chart-type']}>"
         data_str = \
             START + \
-            ';'.join([f'{x},{y}' for x, y in zip(all_x, all_y)]) \
+            ';'.join([f'{x}|{y}' for x, y in zip(all_x, all_y)]) \
             + END
 
         gt_string = BOS_TOKEN + chart_type + data_str

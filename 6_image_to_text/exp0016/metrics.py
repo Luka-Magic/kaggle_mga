@@ -202,8 +202,8 @@ def string2triplet(pred_string: str) -> Tuple[str, List[str], List[str]]:
     y = []
     data_series = pred_string.split(START)[1].split(END)[0].split(";")
     for data in data_series:
-        if re.search(',', data):
-            data = data.split(',')
+        if re.search('|', data):
+            data = data.split('|')
             x.append(data[0])
             y.append(data[1])
 
