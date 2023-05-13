@@ -1,0 +1,7 @@
+hydra-core
+wandb
+lmdb
+datasets
+transformers[sentencepiece]
+pyarrow
+polyleven
