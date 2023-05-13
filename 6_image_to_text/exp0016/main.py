@@ -266,23 +266,10 @@ class MgaDataset(Dataset):
         json_dict = json.loads(label)
 
         gt_string, x_list, y_list = self._json_dict_to_gt_string(json_dict)
-        print(gt_string)
 
         encoding['text'] = gt_string
         encoding['id'] = json_dict['id']
         encoding['phase'] = self.phase
-        if self.phase == 'valid':
-            encoding['info'] = {
-                'img': image,
-                'img_h': h,
-                'img_w': w,
-                'source': json_dict['source'],
-                'x_tick_type': json_dict['axes']['x-axis']['tick-type'],
-                'y_tick_type': json_dict['axes']['y-axis']['tick-type'],
-                'gt_x': x_list,
-                'gt_y': y_list,
-                'chart_type': json_dict['chart-type']
-            }
         return encoding
 
 # Collate_fn
@@ -306,8 +293,6 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
         return_tensors='pt'
     )
 
-    phase = samples[0]['phase']
-
     # Make a multiple of 8 to efficiently use the tensor cores
     text_inputs = processor(
         text=texts,
@@ -320,8 +305,6 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
     batch['labels'] = text_inputs.input_ids
 
     batch["id"] = [x["id"] for x in samples]
-    if phase == 'valid':
-        batch['info'] = [x['info'] for x in samples]
     return batch
 
 # Dataloader
@@ -478,7 +461,6 @@ def valid_function(
 
     outputs = []
     ids = []
-    table_info_list = []
 
     for step, batch in enumerate(dataloader):
         flattened_patches = batch['flattened_patches'].to(device)
@@ -504,65 +486,12 @@ def valid_function(
 
         outputs.extend(processor.tokenizer.batch_decode(output.sequences))
         ids.extend(batch['id'])
-        for info in batch['info']:
-            table_info_list.append(info)
 
-    scores, pred_list = validation_metrics(outputs, ids, gt_df)
-    # create_wandb_table(table_info_list, pred_list, scores)
+    scores, _ = validation_metrics(outputs, ids, gt_df)
     return scores
 
 
-def create_wandb_table(
-    table_info_list: List[Dict[str, Any]],
-    pred_list: List[Dict[str, Any]],
-    scores: Dict[str, Any]
-):
-    """
-    Args:
-        table_info_list (List[Dict[str, Any]]):
-            dict keys: [img, img_h, img_w, source, x_tick_type, y_tick_type, gt, chart_type]
-        pred_list (List[Dict[str, Any]]):
-            dict keys: [id, x, y, chart_type, score]
-        scores (Dict[str, Any]):
-            keys: [valid_score, {chart-type}_score]
-    """
-    global n_images
-    wandb_columns = ['id', 'img', 'gt_x', 'gt_y', 'gt_x_len', 'gt_y_len', 'gt_chart_type', 'pred_x', 'pred_y', 'pred_x_len', 'pred_y_len', 'pred_chart_type', 'score',
-                     'n_images', 'img_h', 'img_w', 'source', 'x_tick_type', 'y_tick_type', 'valid_score']
-    wandb_data = []
-
-    for pred_dict, info_dict in zip(pred_list, table_info_list):
-        data_list = [
-            pred_dict['id'],  # id
-            wandb.Image(info_dict['img']),  # img
-            info_dict['gt_x'],  # gt_x
-            info_dict['gt_y'],  # gt_y
-            len(info_dict['gt_x']),  # gt_x_len
-            len(info_dict['gt_y']),  # gt_y_len
-            info_dict['chart_type'],  # gt_chart_type
-            pred_dict['x'],  # pred_x
-            pred_dict['y'],  # pred_y
-            len(pred_dict['x']),  # pred_x_len
-            len(pred_dict['y']),  # pred_y_len
-            pred_dict['chart_type'],  # pred_chart_type
-            pred_dict['score'],
-            n_images,  # n_images
-            info_dict['img_h'],  # img_h
-            info_dict['img_w'],  # img_w
-            info_dict['source'],  # source
-            info_dict['x_tick_type'],  # x_tick_type
-            info_dict['y_tick_type'],  # y_tick_type
-            scores['valid_score']  # valid_score
-        ]
-        wandb_data.append(data_list)
-    print(wandb_data)
-
-    wandb_table = wandb.Table(columns=wandb_columns, data=wandb_data)
-    wandb.log({'valid result': wandb_table})
-
 # main
-
-
 def main():
     EXP_PATH = Path.cwd()
     with initialize_config_dir(config_dir=str(EXP_PATH / 'config')):
