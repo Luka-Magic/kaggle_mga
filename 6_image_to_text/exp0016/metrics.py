@@ -203,9 +203,12 @@ def string2triplet(pred_string: str) -> Tuple[str, List[str], List[str]]:
     data_series = pred_string.split(START)[1].split(END)[0].split(";")
     for data in data_series:
         if re.search('|', data):
-            data = data.split('|')
-            x.append(data[0])
-            y.append(data[1])
+            data_split = data.split('|')
+            if len(data_split) >= 2:
+                x.append(data_split[0])
+                y.append(data_split[1])
+            else:
+                print(f'\n    check data: {data}')
 
     if len(x) == 0 or len(y) == 0:
         return chart_type, [], []
