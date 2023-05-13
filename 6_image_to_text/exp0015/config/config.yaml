@@ -1,6 +1,6 @@
 #####   BASIC   ######################################
 debug: false
-use_wandb: true
+use_wandb: false
 wandb_project: kaggle_mga_image2text
 dataset_name: data0004
 seed: 77
