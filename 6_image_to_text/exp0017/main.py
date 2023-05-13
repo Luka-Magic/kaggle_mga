@@ -148,10 +148,8 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
         elif label_source == 'generated':
             generated_indicies.append(idx)
 
-    # cfg.sample_ratio
-    # n_generated_indicies = len(generated_indicies)
     generated_indicies = random.sample(
-        generated_indicies, len(generated_indicies) * cfg.sample_ratio)
+        generated_indicies, int(len(generated_indicies) * cfg.sample_ratio))
 
     if cfg.split_method == 'StratifiedKFold':
         for fold, (train_fold_indices, valid_fold_indices) \
