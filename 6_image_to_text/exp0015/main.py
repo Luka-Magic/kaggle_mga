@@ -328,7 +328,7 @@ class MgaDataset(Dataset):
         else:
             image = self.transforms(image=image_arr)['image']
         encoding = {}
-        encoding['image_tensor'] = image_arr
+        encoding['image_tensor'] = image
 
         gt_string, x_list, y_list = self._json_dict_to_gt_string(json_dict)
 
@@ -337,7 +337,7 @@ class MgaDataset(Dataset):
         encoding['phase'] = self.phase
         if self.phase == 'valid':
             encoding['info'] = {
-                'img': image,
+                'img': image_arr,
                 'img_h': h,
                 'img_w': w,
                 'source': json_dict['source'],
