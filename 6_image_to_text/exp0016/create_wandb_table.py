@@ -1,6 +1,6 @@
 # basic
 import sys
-import time
+ import time
 import gc
 import numpy as np
 import pandas as pd
@@ -50,10 +50,8 @@ from metrics import validation_metrics
 
 
 BOS_TOKEN = "<|BOS|>"
-X_START = "<x_start>"
-X_END = "<x_end>"
-Y_START = "<y_start>"
-Y_END = "<y_end>"
+START = "<start>"
+END = "<end>"
 
 SEPARATOR_TOKENS = [
     BOS_TOKEN,
@@ -207,10 +205,12 @@ class MgaDataset(Dataset):
             all_y.append(y)
 
         chart_type = f"<{json_dict['chart-type']}>"
-        x_str = X_START + ";".join(list(map(str, all_x))) + X_END
-        y_str = Y_START + ";".join(list(map(str, all_y))) + Y_END
+        data_str = \
+            START + \
+            ';'.join([f'{x}|{y}' for x, y in zip(all_x, all_y)]) \
+            + END
 
-        gt_string = BOS_TOKEN + chart_type + x_str + y_str
+        gt_string = BOS_TOKEN + chart_type + data_str
 
         return gt_string, list(map(str, all_x)), list(map(str, all_y))
 
@@ -338,7 +338,7 @@ def get_transforms(cfg, phase='train'):
 
 def prepare_dataloader(cfg, lmdb_dir, processor, valid_indices):
     valid_ds = MgaDataset(cfg, lmdb_dir, valid_indices,
-                          processor, get_transforms(cfg, 'valid'), 'valid')
+                          processor, 'valid')
 
     valid_loader = DataLoader(
         valid_ds,
@@ -395,8 +395,6 @@ def valid_function(
         for info in batch['info']:
             table_info_list.append(info)
 
-        if step == 0:
-            print(output)
 
     scores, pred_list = validation_metrics(outputs, ids, gt_df)
     finish_time = time.time()
