@@ -1,6 +1,6 @@
 # basic
 import sys
- import time
+import time
 import gc
 import numpy as np
 import pandas as pd
@@ -394,7 +394,6 @@ def valid_function(
         ids.extend(batch['id'])
         for info in batch['info']:
             table_info_list.append(info)
-
 
     scores, pred_list = validation_metrics(outputs, ids, gt_df)
     finish_time = time.time()
