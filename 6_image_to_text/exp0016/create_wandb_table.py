@@ -55,10 +55,8 @@ END = "<end>"
 
 SEPARATOR_TOKENS = [
     BOS_TOKEN,
-    X_START,
-    X_END,
-    Y_START,
-    Y_END,
+    START,
+    END
 ]
 
 LINE_TOKEN = "<line>"
