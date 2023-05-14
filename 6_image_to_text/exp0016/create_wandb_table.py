@@ -384,7 +384,12 @@ def valid_function(
             eos_token_id=processor.tokenizer.eos_token_id,
             use_cache=True,
             bad_words_ids=[[processor.tokenizer.unk_token_id]],
-            return_dict_in_generate=True
+            return_dict_in_generate=True,
+            early_stopping=True,
+            num_beams=2,  # 1 int    (1 - 10)
+            temperature=.9,  # 1 float  (0 -  ) less div - more div
+            top_k=2,  # 1 int    (1 -  ) less div - more div
+            top_p=.3,  # 1 float (0 - 1) more div - less div
         )
 
         outputs.extend(processor.tokenizer.batch_decode(output.sequences))
