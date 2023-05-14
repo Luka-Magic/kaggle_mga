@@ -11,7 +11,6 @@ use_fold: [0] # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 save_model: true
 use_amp: true
 n_valid_per_epoch: 5
-sample_ratio: 0.1
 
 #####   Model   ######################################
 restart: false
@@ -41,8 +40,6 @@ final_div_factor: 1000. # OCLR
 warmup_step: 1000 # HS
 
 ##### Image Info #####################################
-img_mean: [0.8578, 0.8552, 0.8507]
-img_std: [0.2747, 0.2747, 0.2809]
 img_h: 560
 img_w: 560
 

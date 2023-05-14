@@ -4,11 +4,9 @@ import numpy as np
 import pandas as pd
 from polyleven import levenshtein
 
-PROMPT_TOKEN = "<|PROMPT|>"
-X_START = "<x_start>"
-X_END = "<x_end>"
-Y_START = "<y_start>"
-Y_END = "<y_end>"
+BOS_TOKEN = "<|BOS|>"
+START = "<start>"
+END = "<end>"
 
 LINE_TOKEN = "<line>"
 VERTICAL_BAR_TOKEN = "<vertical_bar>"
@@ -197,16 +195,28 @@ def string2triplet(pred_string: str) -> Tuple[str, List[str], List[str]]:
 
     pred_string = re.sub(r"<one>", "1", pred_string)
 
-    x = pred_string.split(X_START)[1].split(X_END)[0].split(";")
-    y = pred_string.split(Y_START)[1].split(Y_END)[0].split(";")
+    # x = pred_string.split(X_START)[1].split(X_END)[0].split(";")
+    # y = pred_string.split(Y_START)[1].split(Y_END)[0].split(";")
+
+    x = []
+    y = []
+    data_series = pred_string.split(START)[1].split(END)[0].split(";")
+    for data in data_series:
+        if '|' in data:
+            data_split = data.split('|')
+            if len(data_split) >= 2:
+                x.append(data_split[0])
+                y.append(data_split[1])
+            else:
+                print(f'\n    check data: {data}')
 
     if len(x) == 0 or len(y) == 0:
         return chart_type, [], []
 
-    min_length = min(len(x), len(y))
+    # min_length = min(len(x), len(y))
 
-    x = x[:min_length]
-    y = y[:min_length]
+    # x = x[:min_length]
+    # y = y[:min_length]
 
     return chart_type, x, y
 
@@ -217,7 +227,7 @@ def validation_metrics(val_outputs: List[str], val_ids: List[str], gt_df: pd.Dat
 
     Args:
         val_outputs (List[str]): A list of validation outputs.
-            str: <|PROMPT|><line><x_start> ... </s>
+            str: <|BOS|><line><start> ... <end></s>
         val_ids (List[str]): A list of validation ids.
             str: index(0 ~ length_of_dataset)
         gt_df (pd.DataFrame): The ground truth dataframe.
@@ -232,7 +242,7 @@ def validation_metrics(val_outputs: List[str], val_ids: List[str], gt_df: pd.Dat
 
     for example_output in val_outputs:
 
-        if not all([x in example_output for x in [X_START, X_END, Y_START, Y_END]]):
+        if not all([x in example_output for x in [START, END]]):
             pred_triplets.append(("line", [], []))
         else:
             pred_triplets.append(string2triplet(example_output))

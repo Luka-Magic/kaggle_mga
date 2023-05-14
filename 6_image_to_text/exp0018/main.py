@@ -49,17 +49,13 @@ from metrics import validation_metrics
 
 
 BOS_TOKEN = "<|BOS|>"
-X_START = "<|x_start|>"
-X_END = "<|x_end|>"
-Y_START = "<|y_start|>"
-Y_END = "<|y_end|>"
+START = "<|start|>"
+END = "<|end|>"
 
 SEPARATOR_TOKENS = [
     BOS_TOKEN,
-    X_START,
-    X_END,
-    Y_START,
-    Y_END,
+    START,
+    END
 ]
 
 LINE_TOKEN = "<line>"
@@ -148,11 +144,6 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
         elif label_source == 'generated':
             generated_indicies.append(idx)
 
-    # cfg.sample_ratio
-    # n_generated_indicies = len(generated_indicies)
-    generated_indicies = random.sample(
-        generated_indicies, int(len(generated_indicies) * cfg.sample_ratio))
-
     if cfg.split_method == 'StratifiedKFold':
         for fold, (train_fold_indices, valid_fold_indices) \
                 in enumerate(StratifiedKFold(n_splits=cfg.n_folds, shuffle=True, random_state=cfg.seed).split(extracted_indices, stratified_label)):
@@ -186,68 +177,12 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
     return indices_dict
 
 
-def get_transforms(cfg, mode='generated'):
-    if mode == 'generated':
-        return A.Compose([
-            # 色彩変換
-            A.OneOf([
-                A.ChannelShuffle(p=1.),  # RGBの並び替え,
-                A.RandomGamma((30, 180), p=1.),
-                A.RandomBrightnessContrast(
-                    brightness_limit=(-0.05, 0.2),
-                    contrast_limit=(-0.05, 0.2),
-                    p=1.),
-            ], p=0.3),
-
-            # gray scale
-            A.ToGray(p=0.1),
-
-            # 低画質化
-            A.OneOf([
-                A.GaussianBlur(
-                    blur_limit=(3, 5),
-                    sigma_limit=0.7,
-                    p=1.),
-                A.GaussianBlur(
-                    blur_limit=(3, 5),
-                    sigma_limit=0.7,
-                    p=1.),
-                A.GaussNoise(mean=30, p=1.),
-                A.JpegCompression(quality_lower=50, quality_upper=100, p=1.),
-                A.Downscale(scale_min=0.75, scale_max=0.99, p=1.),
-            ], p=0.3),
-
-            A.Resize(height=cfg.img_h, width=cfg.img_w),
-            A.Normalize(cfg.img_mean, cfg.img_std),
-            ToTensorV2()
-        ])
-    elif mode == 'extracted':
-        return A.Compose([
-            A.Resize(height=cfg.img_h, width=cfg.img_w),
-            A.Normalize(cfg.img_mean, cfg.img_std),
-            ToTensorV2()
-        ])
-
-    elif mode == 'valid':
-        return A.Compose([
-            A.Resize(height=cfg.img_h, width=cfg.img_w),
-            A.Normalize(cfg.img_mean, cfg.img_std),
-            ToTensorV2()
-        ])
-
-
 # Dataset
 class MgaDataset(Dataset):
     def __init__(self, cfg, lmdb_dir, indices, processor, phase):
         self.cfg = cfg
         self.indices = indices
         self.processor = processor
-        if phase == 'train':
-            self.transforms_gen = get_transforms(cfg, mode='generated')
-            self.transforms_ext = get_transforms(cfg, mode='extracted')
-        elif phase == 'valid':
-            self.transforms = get_transforms(cfg, mode='valid')
-
         self.phase = phase
         self.env = lmdb.open(str(lmdb_dir), max_readers=32,
                              readonly=True, lock=False, readahead=False, meminit=False)
@@ -276,10 +211,12 @@ class MgaDataset(Dataset):
             all_y.append(y)
 
         chart_type = f"<{json_dict['chart-type']}>"
-        x_str = X_START + ";".join(list(map(str, all_x))) + X_END
-        y_str = Y_START + ";".join(list(map(str, all_y))) + Y_END
+        data_str = \
+            START + \
+            ';'.join([f'{x}|{y}' for x, y in zip(all_x, all_y)]) \
+            + END
 
-        gt_string = BOS_TOKEN + chart_type + x_str + y_str
+        gt_string = BOS_TOKEN + chart_type + data_str
 
         return gt_string, list(map(str, all_x)), list(map(str, all_y))
 
@@ -315,43 +252,24 @@ class MgaDataset(Dataset):
             label_key = f'label-{str(idx+1).zfill(8)}'.encode()
             label = txn.get(label_key).decode('utf-8')
 
-        # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
-        json_dict = json.loads(label)
-
         # image
         buf = six.BytesIO()
         buf.write(imgbuf)
         buf.seek(0)
-        image_arr = np.array(Image.open(buf).convert('RGB'))
-        h, w, _ = image_arr.shape
+        image = np.array(Image.open(buf).convert('RGB'))
+        h, w, _ = image.shape
 
-        if self.phase == 'train':
-            if json_dict['source'] == 'generated':
-                image = self.transforms_gen(image=image_arr)['image']
-            elif json_dict['source'] == 'extracted':
-                image = self.transforms_ext(image=image_arr)['image']
-        else:
-            image = self.transforms(image=image_arr)['image']
         encoding = {}
-        encoding['image_tensor'] = image
+        encoding['image_arr'] = image
+
+        # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
+        json_dict = json.loads(label)
 
         gt_string, x_list, y_list = self._json_dict_to_gt_string(json_dict)
 
         encoding['text'] = gt_string
         encoding['id'] = json_dict['id']
         encoding['phase'] = self.phase
-        if self.phase == 'valid':
-            encoding['info'] = {
-                'img': image_arr,
-                'img_h': h,
-                'img_w': w,
-                'source': json_dict['source'],
-                'x_tick_type': json_dict['axes']['x-axis']['tick-type'],
-                'y_tick_type': json_dict['axes']['y-axis']['tick-type'],
-                'gt_x': x_list,
-                'gt_y': y_list,
-                'chart_type': json_dict['chart-type']
-            }
         return encoding
 
 # Collate_fn
@@ -365,7 +283,8 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
     """
 
     texts = [item['text'] for item in samples]
-    images = [item['image_tensor'] for item in samples]
+    images = [item['image_arr'] for item in samples]
+
 
     batch = processor(
         images=images,
@@ -374,8 +293,6 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
         max_patches=max_patches,
         return_tensors='pt'
     )
-
-    phase = samples[0]['phase']
 
     # Make a multiple of 8 to efficiently use the tensor cores
     text_inputs = processor(
@@ -389,10 +306,7 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
     batch['labels'] = text_inputs.input_ids
 
     batch["id"] = [x["id"] for x in samples]
-    if phase == 'valid':
-        batch['info'] = [x['info'] for x in samples]
     return batch
-
 
 # Dataloader
 
@@ -552,7 +466,6 @@ def valid_function(
 
     outputs = []
     ids = []
-    table_info_list = []
 
     for step, batch in enumerate(dataloader):
         flattened_patches = batch['flattened_patches'].to(device)
@@ -578,10 +491,8 @@ def valid_function(
 
         outputs.extend(processor.tokenizer.batch_decode(output.sequences))
         ids.extend(batch['id'])
-        for info in batch['info']:
-            table_info_list.append(info)
 
-    scores, pred_list = validation_metrics(outputs, ids, gt_df)
+    scores, _ = validation_metrics(outputs, ids, gt_df)
     return scores
 
 
@@ -636,11 +547,9 @@ def main():
         # model
         model = Pix2StructForConditionalGeneration.from_pretrained(
             str(pretrained_path)).to(device)
-
         model.decoder.resize_token_embeddings(len(processor.tokenizer))
         model.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids([
                                                                                  BOS_TOKEN])[0]
-        model.config.text_config.is_decoder = True
 
         print(f'load model: {str(pretrained_path)}')
         if cfg.restart:
