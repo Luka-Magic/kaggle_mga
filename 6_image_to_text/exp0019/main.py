@@ -405,11 +405,11 @@ def train_valid_one_epoch(
                 attention_mask=attention_mask,
                 labels=labels
             )
-        loss = loss_fn(
-            output.logits,
-            labels,
-            sources
-        )
+            loss = loss_fn(
+                output.logits,
+                labels,
+                sources
+            )
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
