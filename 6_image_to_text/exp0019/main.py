@@ -285,7 +285,7 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
 
     texts = [item['text'] for item in samples]
     images = [item['image_arr'] for item in samples]
-    sources = [[item['source']] for item in samples]
+    sources = [item['source'] for item in samples]
 
     batch = processor(
         images=images,
@@ -305,7 +305,7 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
         max_length=max_length
     )
     batch['labels'] = text_inputs.input_ids
-    batch['sources'] = torch.stack(sources)
+    batch['sources'] = torch.tensor(sources)
     batch["id"] = [x["id"] for x in samples]
     return batch
 
