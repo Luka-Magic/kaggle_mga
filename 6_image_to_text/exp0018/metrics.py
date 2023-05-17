@@ -5,8 +5,8 @@ import pandas as pd
 from polyleven import levenshtein
 
 BOS_TOKEN = "<|BOS|>"
-START = "<start>"
-END = "<end>"
+START = "<|start|>"
+END = "<|end|>"
 
 LINE_TOKEN = "<line>"
 VERTICAL_BAR_TOKEN = "<vertical_bar>"
