@@ -262,6 +262,8 @@ class MgaDataset(Dataset):
         encoding = {}
         encoding['image_arr'] = image
 
+        encoding['source'] = 0 if json_dict['source'] == 'generaeted' else 1
+
         # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
         json_dict = json.loads(label)
 
@@ -284,7 +286,7 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
 
     texts = [item['text'] for item in samples]
     images = [item['image_arr'] for item in samples]
-
+    sources = [item['source'] for item in samples]
 
     batch = processor(
         images=images,
@@ -304,7 +306,7 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
         max_length=max_length
     )
     batch['labels'] = text_inputs.input_ids
-
+    batch['sources'] = torch.stack(sources)
     batch["id"] = [x["id"] for x in samples]
     return batch
 
@@ -336,7 +338,33 @@ def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices):
     return train_loader, valid_loader
 
 
+# custom loss
+class CrossEntropyWithWeightLoss(nn.Module):
+    def __init__(self, weight_extracted=100.):
+        super().__init__()
+        self.log_softmax = nn.LogSoftmax(dim=1)
+        self.weight_extracted = weight_extracted
+
+    def forward(self, input, target, source):
+        '''
+            input: (bs, length, vocab_size)
+            target: (bs, length)
+            source: (bs)
+        '''
+
+        bs, l, vs = input.shape
+        input = input.reshape(-1, vs)
+        target = target.reshape(-1)
+        source = torch.tile(source, (1, l)).reshape(-1)
+        weight = self.weight_extracted * source + (1. - source)
+
+        ls = self.log_softmax(input)
+        loss_per_bs = -1 * ls.index_select(-1, target).diag()  # (bs * len)
+        return torch.mean(loss_per_bs * weight)
+
 # Train function
+
+
 def train_valid_one_epoch(
     cfg,
     fold: int,
@@ -369,6 +397,7 @@ def train_valid_one_epoch(
         flattened_patches = batch['flattened_patches'].to(device)
         attention_mask = batch['attention_mask'].to(device)
         labels = batch["labels"].to(device)
+        sources = batch['sources'].to(device).long()
         bs = len(flattened_patches)
         n_images += bs
         with autocast(enabled=cfg.use_amp):
@@ -378,7 +407,10 @@ def train_valid_one_epoch(
                 labels=labels
             )
         chart_type_loss = loss_fn(
-            output.logits.reshape(-1, model.decoder.config.vocab_size)[1:2, :], labels.reshape(-1)[1:2])
+            output.logits.reshape(-1, model.decoder.config.vocab_size)[1:2, :],
+            labels.reshape(-1)[1:2],
+            sources
+        )
 
         loss = output.loss + cfg.weight_chart_type * chart_type_loss
 
@@ -568,7 +600,8 @@ def main():
             cfg, LMDB_DIR, processor, train_indices, valid_indices)
 
         # loss_fn
-        loss_fn = nn.CrossEntropyLoss()
+        loss_fn = CrossEntropyWithWeightLoss(
+            weight_extracted=cfg.weight_extracted)
 
         # optimizer
         optimizer = Adafactor(model.parameters(

@@ -19,7 +19,8 @@ pretrained_model_exp_name: exp0016
 max_new_tokens: 512
 
 #####   Loss   #######################################
-weight_chart_type: 100.
+weight_chart_type: 10.
+weight_extracted: 10.
 
 ##### Optimizer ######################################
 optimizer: AdamW
