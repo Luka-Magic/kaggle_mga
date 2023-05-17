@@ -285,7 +285,7 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
 
     texts = [item['text'] for item in samples]
     images = [item['image_arr'] for item in samples]
-    sources = [item['source'] for item in samples]
+    sources = [[item['source']] for item in samples]
 
     batch = processor(
         images=images,
