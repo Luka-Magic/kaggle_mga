@@ -262,14 +262,13 @@ class MgaDataset(Dataset):
         encoding = {}
         encoding['image_arr'] = image
 
-        encoding['source'] = 0 if json_dict['source'] == 'generaeted' else 1
-
         # label: ['source', 'chart-type', 'plot-bb', 'text', 'axes', 'data-series', 'id', 'key_point']
         json_dict = json.loads(label)
 
         gt_string, x_list, y_list = self._json_dict_to_gt_string(json_dict)
 
         encoding['text'] = gt_string
+        encoding['source'] = 0 if json_dict['source'] == 'generaeted' else 1
         encoding['id'] = json_dict['id']
         encoding['phase'] = self.phase
         return encoding
@@ -406,13 +405,11 @@ def train_valid_one_epoch(
                 attention_mask=attention_mask,
                 labels=labels
             )
-        chart_type_loss = loss_fn(
-            output.logits.reshape(-1, model.decoder.config.vocab_size)[1:2, :],
-            labels.reshape(-1)[1:2],
+        loss = loss_fn(
+            output.logits.reshape(-1, model.decoder.config.vocab_size),
+            labels.reshape(-1),
             sources
         )
-
-        loss = output.loss + cfg.weight_chart_type * chart_type_loss
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
