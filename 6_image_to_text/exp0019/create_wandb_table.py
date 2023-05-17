@@ -50,17 +50,13 @@ from metrics import validation_metrics
 
 
 BOS_TOKEN = "<|BOS|>"
-X_START = "<x_start>"
-X_END = "<x_end>"
-Y_START = "<y_start>"
-Y_END = "<y_end>"
+START = "<|start|>"
+END = "<|end|>"
 
 SEPARATOR_TOKENS = [
     BOS_TOKEN,
-    X_START,
-    X_END,
-    Y_START,
-    Y_END,
+    START,
+    END
 ]
 
 LINE_TOKEN = "<line>"
@@ -174,12 +170,10 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
 
 # Dataset
 class MgaDataset(Dataset):
-    def __init__(self, cfg, lmdb_dir, indices, processor, transforms, phase):
+    def __init__(self, cfg, lmdb_dir, indices, processor):
         self.cfg = cfg
         self.indices = indices
         self.processor = processor
-        self.phase = phase
-        self.transforms = transforms
         self.env = lmdb.open(str(lmdb_dir), max_readers=32,
                              readonly=True, lock=False, readahead=False, meminit=False)
 
@@ -207,10 +201,12 @@ class MgaDataset(Dataset):
             all_y.append(y)
 
         chart_type = f"<{json_dict['chart-type']}>"
-        x_str = X_START + ";".join(list(map(str, all_x))) + X_END
-        y_str = Y_START + ";".join(list(map(str, all_y))) + Y_END
+        data_str = \
+            START + \
+            ';'.join([f'{x}|{y}' for x, y in zip(all_x, all_y)]) \
+            + END
 
-        gt_string = BOS_TOKEN + chart_type + x_str + y_str
+        gt_string = BOS_TOKEN + chart_type + data_str
 
         return gt_string, list(map(str, all_x)), list(map(str, all_y))
 
@@ -219,7 +215,6 @@ class MgaDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict[str, Union[torch.Tensor, List[int], str]]:
         """
-
         lmdbからidに一致したimageとlabelを取り出す
 
         image
@@ -263,20 +258,19 @@ class MgaDataset(Dataset):
         gt_string, x_list, y_list = self._json_dict_to_gt_string(json_dict)
 
         encoding['text'] = gt_string
+        encoding['source'] = 0 if json_dict['source'] == 'generaeted' else 1
         encoding['id'] = json_dict['id']
-        encoding['phase'] = self.phase
-        if self.phase == 'valid':
-            encoding['info'] = {
-                'img': image,
-                'img_h': h,
-                'img_w': w,
-                'source': json_dict['source'],
-                'x_tick_type': json_dict['axes']['x-axis']['tick-type'],
-                'y_tick_type': json_dict['axes']['y-axis']['tick-type'],
-                'gt_x': x_list,
-                'gt_y': y_list,
-                'chart_type': json_dict['chart-type']
-            }
+        encoding['info'] = {
+            'img': image,
+            'img_h': h,
+            'img_w': w,
+            'source': json_dict['source'],
+            'x_tick_type': json_dict['axes']['x-axis']['tick-type'],
+            'y_tick_type': json_dict['axes']['y-axis']['tick-type'],
+            'gt_x': x_list,
+            'gt_y': y_list,
+            'chart_type': json_dict['chart-type']
+        }
         return encoding
 
 # Collate_fn
@@ -291,6 +285,7 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
 
     texts = [item['text'] for item in samples]
     images = [item['image_arr'] for item in samples]
+    sources = [item['source'] for item in samples]
 
     batch = processor(
         images=images,
@@ -299,8 +294,6 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
         max_patches=max_patches,
         return_tensors='pt'
     )
-
-    phase = samples[0]['phase']
 
     # Make a multiple of 8 to efficiently use the tensor cores
     text_inputs = processor(
@@ -312,33 +305,18 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
         max_length=max_length
     )
     batch['labels'] = text_inputs.input_ids
-
+    batch['sources'] = torch.tensor(sources)
     batch["id"] = [x["id"] for x in samples]
-    if phase == 'valid':
-        batch['info'] = [x['info'] for x in samples]
+    batch['info'] = [x['info'] for x in samples]
     return batch
 
-
-def get_transforms(cfg, phase='train'):
-    if phase == 'train':
-        return A.Compose([
-            A.Resize(height=cfg.img_h, width=cfg.img_w),
-            A.Normalize(cfg.img_mean, cfg.img_std),
-            ToTensorV2()
-        ])
-    elif phase == 'valid':
-        return A.Compose([
-            A.Resize(height=cfg.img_h, width=cfg.img_w),
-            A.Normalize(cfg.img_mean, cfg.img_std),
-            ToTensorV2()
-        ])
 
 # Dataloader
 
 
 def prepare_dataloader(cfg, lmdb_dir, processor, valid_indices):
     valid_ds = MgaDataset(cfg, lmdb_dir, valid_indices,
-                          processor, get_transforms(cfg, 'valid'), 'valid')
+                          processor)
 
     valid_loader = DataLoader(
         valid_ds,
@@ -394,9 +372,6 @@ def valid_function(
         ids.extend(batch['id'])
         for info in batch['info']:
             table_info_list.append(info)
-
-        if step == 0:
-            print(output)
 
     scores, pred_list = validation_metrics(outputs, ids, gt_df)
     finish_time = time.time()
@@ -469,19 +444,17 @@ def main():
 
     seed_everything(cfg.seed)
 
-    if cfg.use_wandb:
-        wandb.login()
+    wandb.login()
 
     device = torch.device('cuda') if torch.cuda.is_available() else 'cpu'
     indices_per_fold = split_data(cfg, LMDB_DIR)
 
     for fold in cfg.use_fold:
-        if cfg.use_wandb:
-            wandb.config = OmegaConf.to_container(
-                cfg, resolve=True, throw_on_missing=True)
-            wandb.init(project=cfg.wandb_project, entity='luka-magic',
-                       name=f'{exp_name.replace("exp", "valid")}', config=wandb.config)
-            wandb.config.fold = fold
+        wandb.config = OmegaConf.to_container(
+            cfg, resolve=True, throw_on_missing=True)
+        wandb.init(project=cfg.wandb_project, entity='luka-magic',
+                   name=f'{exp_name.replace("exp", "valid")}', config=wandb.config)
+        wandb.config.fold = fold
 
         # restart or load pretrained model from internet
         pretrained_path = SAVE_DIR.parent / exp_name
