@@ -285,7 +285,6 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
     texts = [item['text'] for item in samples]
     images = [item['image_arr'] for item in samples]
 
-
     batch = processor(
         images=images,
         random_padding=True,
@@ -377,10 +376,11 @@ def train_valid_one_epoch(
                 attention_mask=attention_mask,
                 labels=labels
             )
-        chart_type_loss = loss_fn(
-            output.logits.reshape(-1, model.decoder.config.vocab_size)[1:2, :], labels.reshape(-1)[1:2])
-
-        loss = output.loss + cfg.weight_chart_type * chart_type_loss
+        # chart_type_loss = loss_fn(
+        #     output.logits.reshape(-1, model.decoder.config.vocab_size)[1:2, :], labels.reshape(-1)[1:2])
+        loss = loss_fn(
+            output.logits.reshape(-1, model.decoder.config.vocab_size), labels.reshape(-1))
+        # loss = output.loss + cfg.weight_chart_type * chart_type_loss
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
