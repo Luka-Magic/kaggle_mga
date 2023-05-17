@@ -406,8 +406,8 @@ def train_valid_one_epoch(
                 labels=labels
             )
         loss = loss_fn(
-            output.logits.reshape(-1, model.decoder.config.vocab_size),
-            labels.reshape(-1),
+            output.logits,
+            labels,
             sources
         )
 
