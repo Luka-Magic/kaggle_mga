@@ -376,12 +376,9 @@ def train_valid_one_epoch(
                 attention_mask=attention_mask,
                 labels=labels
             )
-        # chart_type_loss = loss_fn(
-        #     output.logits.reshape(-1, model.decoder.config.vocab_size)[1:2, :], labels.reshape(-1)[1:2])
-        # loss = loss_fn(
-        #     output.logits.reshape(-1, model.decoder.config.vocab_size), labels.reshape(-1))
-        # loss = output.loss + cfg.weight_chart_type * chart_type_loss
-        loss = output.loss
+        chart_type_loss = loss_fn(
+            output.logits.reshape(-1, model.decoder.config.vocab_size)[1:2, :], labels.reshape(-1)[1:2])
+        loss = output.loss + cfg.weight_chart_type * chart_type_loss
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
