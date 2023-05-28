@@ -1,0 +1,61 @@
+chart_type:
+  type_weight:
+    scatter: 1.0
+title:
+  title_weight: 0.3
+axis_title:
+  axis_title_weight: 0.3
+
+scatter:
+  n_data:
+    min: 10
+    max: 100
+    mean: 50
+  data_type:
+    x:
+      float: 1.0
+    y:
+      float: 1.0
+  rate_2d: 1.0
+  distribution:
+    normal: 0.3
+    uniform: 0.4
+    poisson: 0.
+    binomial: 0.1
+    gamma: 0.1
+    beta: 0.1
+  ticks:
+    n_ticks:
+      min: 3
+      max: 15
+      mean: 7
+    start:
+      zero: 0.45
+      minus: 0.05
+      else: 0.5
+    type:
+      int: 0.7 # (1 ~ 9)
+      float: 0.3 # (1.0 ~ 9.9)
+    digit: # (1.0~9.9 * 10^digit)
+      d-4: 0.01
+      d-3: 0.01
+      d-2: 0.02
+      d-1: 0.16
+      d0: 0.2
+      d1: 0.2
+      d2: 0.2
+      d3: 0.16
+      d4: 0.02
+      d5: 0.01
+      d6: 0.01
+  margin:
+    rate_small: 0.1
+    small:
+      min: 0
+      max: 0.1
+      mean: 0.05
+    large:
+      min: 0.2
+      max: 0.5
+      mean: 0.3
+  mse_line: 0.05
