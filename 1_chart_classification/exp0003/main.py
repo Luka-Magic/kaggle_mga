@@ -316,7 +316,8 @@ def main():
     indices_dict = split_data(cfg, LMDB_DIR)
 
     for fold in cfg.use_fold:
-
+        if fold == 0:
+            continue
         if cfg.use_wandb:
             wandb.config = OmegaConf.to_container(
                 cfg, resolve=True, throw_on_missing=True)
@@ -407,8 +408,8 @@ def main():
                     'valid_loss': valid_loss,
                     'valid_accuracy': valid_accuracy
                 })
-    wandb.finish()
-    del model, train_loader, valid_loader, loss_fn, optimizer, scheduler, best_loss, best_accuracy
+        wandb.finish()
+        del model, train_loader, valid_loader, loss_fn, optimizer, scheduler, best_loss, best_accuracy
 
 
 if __name__ == '__main__':
