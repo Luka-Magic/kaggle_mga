@@ -366,7 +366,7 @@ def valid_function(
             use_cache=True,
             bad_words_ids=[[processor.tokenizer.unk_token_id]],
             return_dict_in_generate=True,
-            temperature=0.9
+            temperature=1.0
         )
 
         outputs.extend(processor.tokenizer.batch_decode(output.sequences))
