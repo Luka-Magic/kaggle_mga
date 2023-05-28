@@ -191,7 +191,7 @@ class MgaDataset(Dataset):
                              readonly=True, lock=False, readahead=False, meminit=False)
         if indices is None:
             with self.env.begin(write=False) as txn:
-                n_samples = int(f'n-samples'.encode())
+                n_samples = int(txn.get('num-samples'.encode()))
             self.indices = list(range(n_samples))
 
     def _json_dict_to_gt_string(self, json_dict: Dict[str, Any]) -> str:
