@@ -11,12 +11,12 @@ n_folds: 5
 use_fold: [0] # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 save_model: true
 use_amp: true
-n_valid_per_epoch: 1
+n_valid_per_epoch: 5
 
 #####   Model   ######################################
-restart: false
+restart: true
 pretrained_model_from_net_path: google/matcha-base
-pretrained_model_exp_name:
+pretrained_model_exp_name: exp0016
 max_new_tokens: 512
 
 #####   Loss   #######################################
