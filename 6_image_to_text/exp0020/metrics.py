@@ -8,19 +8,19 @@ BOS_TOKEN = "<|BOS|>"
 START = "<|start|>"
 END = "<|end|>"
 
-LINE_TOKEN = "<line>"
-VERTICAL_BAR_TOKEN = "<vertical_bar>"
-HORIZONTAL_BAR_TOKEN = "<horizontal_bar>"
-SCATTER_TOKEN = "<scatter>"
-DOT_TOKEN = "<dot>"
+# LINE_TOKEN = "<line>"
+# VERTICAL_BAR_TOKEN = "<vertical_bar>"
+# HORIZONTAL_BAR_TOKEN = "<horizontal_bar>"
+# SCATTER_TOKEN = "<scatter>"
+# DOT_TOKEN = "<dot>"
 
-CHART_TYPE_TOKENS = [
-    LINE_TOKEN,
-    VERTICAL_BAR_TOKEN,
-    HORIZONTAL_BAR_TOKEN,
-    SCATTER_TOKEN,
-    DOT_TOKEN,
-]
+# CHART_TYPE_TOKENS = [
+#     LINE_TOKEN,
+#     VERTICAL_BAR_TOKEN,
+#     HORIZONTAL_BAR_TOKEN,
+#     SCATTER_TOKEN,
+#     DOT_TOKEN,
+# ]
 
 
 def rmse(y_true: List[float], y_pred: List[float]) -> float:
@@ -188,10 +188,10 @@ def string2triplet(pred_string: str) -> Tuple[str, List[str], List[str]]:
         Tuple[str, List[str], List[str]]: A triplet of chart type, x values, and y values.
     """
 
-    chart_type = "line"
-    for tok in CHART_TYPE_TOKENS:
-        if tok in pred_string:
-            chart_type = tok.strip("<>")
+    chart_type = "scatter"
+    # for tok in CHART_TYPE_TOKENS:
+    #     if tok in pred_string:
+    #         chart_type = tok.strip("<>")
 
     pred_string = re.sub(r"<one>", "1", pred_string)
 
@@ -243,7 +243,7 @@ def validation_metrics(val_outputs: List[str], val_ids: List[str], gt_df: pd.Dat
     for example_output in val_outputs:
 
         if not all([x in example_output for x in [START, END]]):
-            pred_triplets.append(("line", [], []))
+            pred_triplets.append(("scatter", [], []))
         else:
             pred_triplets.append(string2triplet(example_output))
             # <?_start> ~ <?_end>までをx, yそれぞれ切り取り;でsplitしてlist化, 短い方の長さに揃える。

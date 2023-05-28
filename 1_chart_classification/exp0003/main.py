@@ -159,10 +159,9 @@ class MgaLmdbDataset(Dataset):
 
         # label
         json_dict = json.loads(label)
-        source = 0 if json_dict['source'] == 'generated' else 1
         label = self.chart_type2label[json_dict['chart-type']]
 
-        return img, label, source
+        return img, label
 
 
 def get_transforms(cfg, phase):
@@ -235,10 +234,9 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
 
-    for _, (images, labels, source) in pbar:
+    for _, (images, labels) in pbar:
         images = images.to(device).float()
         labels = labels.to(device).long()
-        source = source.to(device).long()
         bs = len(images)
 
         with autocast(enabled=cfg.use_amp):
@@ -276,7 +274,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
 
-    for _, (images, labels, _) in pbar:
+    for _, (images, labels) in pbar:
         images = images.to(device).float()
         labels = labels.to(device).long()
         bs = len(images)
@@ -295,10 +293,6 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
         pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
 
     return losses.avg, accuracy.avg
-
-
-def weight_ce(output, target, source):
-    output - target
 
 
 def main():
@@ -342,10 +336,10 @@ def main():
         model = MgaModel(cfg).to(device)
 
         # loss
-        # if cfg.loss_fn == 'CrossEntropyLoss':
-        #     loss_fn = torch.nn.CrossEntropyLoss()
-        # else:
-        #     NotImplementedError
+        if cfg.loss_fn == 'CrossEntropyLoss':
+            loss_fn = torch.nn.CrossEntropyLoss()
+        else:
+            NotImplementedError
 
         # optimizer
         if cfg.optimizer == 'AdamW':

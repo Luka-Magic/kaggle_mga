@@ -58,21 +58,21 @@ SEPARATOR_TOKENS = [
     END
 ]
 
-LINE_TOKEN = "<line>"
-VERTICAL_BAR_TOKEN = "<vertical_bar>"
-HORIZONTAL_BAR_TOKEN = "<horizontal_bar>"
-SCATTER_TOKEN = "<scatter>"
-DOT_TOKEN = "<dot>"
+# LINE_TOKEN = "<line>"
+# VERTICAL_BAR_TOKEN = "<vertical_bar>"
+# HORIZONTAL_BAR_TOKEN = "<horizontal_bar>"
+# SCATTER_TOKEN = "<scatter>"
+# DOT_TOKEN = "<dot>"
 
-CHART_TYPE_TOKENS = [
-    LINE_TOKEN,
-    VERTICAL_BAR_TOKEN,
-    HORIZONTAL_BAR_TOKEN,
-    SCATTER_TOKEN,
-    DOT_TOKEN,
-]
+# CHART_TYPE_TOKENS = [
+#     LINE_TOKEN,
+#     VERTICAL_BAR_TOKEN,
+#     HORIZONTAL_BAR_TOKEN,
+#     SCATTER_TOKEN,
+#     DOT_TOKEN,
+# ]
 
-new_tokens = SEPARATOR_TOKENS + CHART_TYPE_TOKENS
+new_tokens = SEPARATOR_TOKENS  # + CHART_TYPE_TOKENS
 
 CHART_TYPE2LABEL = {
     'line': 0,
@@ -217,13 +217,13 @@ class MgaDataset(Dataset):
             all_x.append(x)
             all_y.append(y)
 
-        chart_type = f"<{json_dict['chart-type']}>"
+        # chart_type = f"<{json_dict['chart-type']}>"
         data_str = \
             START + \
             ';'.join([f'{x}|{y}' for x, y in zip(all_x, all_y)]) \
             + END
 
-        gt_string = BOS_TOKEN + chart_type + data_str
+        gt_string = BOS_TOKEN + data_str
 
         return gt_string, list(map(str, all_x)), list(map(str, all_y))
 
