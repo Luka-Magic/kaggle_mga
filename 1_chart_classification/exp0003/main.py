@@ -387,12 +387,12 @@ def main():
             }
             if valid_loss < best_score['loss']:
                 best_score['loss'] = valid_loss
-                torch.save(save_dict, str(SAVE_DIR / 'best_loss.pth'))
                 if cfg.use_wandb:
                     wandb.run.summary['best_loss'] = best_score['loss']
             if valid_accuracy > best_score['accuracy']:
                 best_score['accuracy'] = valid_accuracy
-                torch.save(save_dict, str(SAVE_DIR / 'best_accuracy.pth'))
+                torch.save(save_dict, str(
+                    SAVE_DIR / f'best_accuracy_{fold}.pth'))
                 if cfg.use_wandb:
                     wandb.run.summary['best_accuracy'] = best_score['accuracy']
             del save_dict
