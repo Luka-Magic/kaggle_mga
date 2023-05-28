@@ -35,7 +35,7 @@ from albumentations.pytorch import ToTensorV2
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, ConcatDataset
 from torch import optim
 from torchvision.transforms import Compose
 from torch.cuda.amp import autocast, GradScaler
@@ -128,6 +128,9 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
             label = txn.get(label_key).decode('utf-8')
         json_dict = json.loads(label)
 
+        if json_dict['chart-type'] != 'scatter':
+            continue
+
         label_source = json_dict['source']
 
         if label_source == 'extracted':
@@ -186,6 +189,10 @@ class MgaDataset(Dataset):
         self.phase = phase
         self.env = lmdb.open(str(lmdb_dir), max_readers=32,
                              readonly=True, lock=False, readahead=False, meminit=False)
+        if indices is None:
+            with self.env.begin(write=False) as txn:
+                n_samples = int(f'n-samples'.encode())
+            self.indices = list(range(n_samples))
 
     def _json_dict_to_gt_string(self, json_dict: Dict[str, Any]) -> str:
         """
@@ -268,7 +275,7 @@ class MgaDataset(Dataset):
         gt_string, x_list, y_list = self._json_dict_to_gt_string(json_dict)
 
         encoding['text'] = gt_string
-        encoding['source'] = 0 if json_dict['source'] == 'generaeted' else 1
+        encoding['source'] = 1 if json_dict['source'] == 'extracted' else 0
         encoding['id'] = json_dict['id']
         encoding['phase'] = self.phase
         return encoding
@@ -312,11 +319,20 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
 # Dataloader
 
 
-def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices):
-    train_ds = MgaDataset(cfg, lmdb_dir, train_indices,
-                          processor, 'train')
+def prepare_dataloader(cfg, lmdb_dir, EXTRA_LMDB_DIRS, processor, train_indices, valid_indices):
+    train_ds_list = []
+    train_ds_list.append(MgaDataset(cfg, lmdb_dir, train_indices,
+                                    processor, 'train'))
+
+    for extra_lmdb_dir in EXTRA_LMDB_DIRS:
+        train_ds_list.append(MgaDataset(cfg, extra_lmdb_dir, None,
+                                        processor, 'train'))
+
+    train_ds = ConcatDataset(train_ds_list)
+
     valid_ds = MgaDataset(cfg, lmdb_dir, valid_indices,
                           processor, 'valid')
+
     train_loader = DataLoader(
         train_ds,
         batch_size=cfg.train_bs,
@@ -535,6 +551,7 @@ def main():
     exp_name = EXP_PATH.name
     project_name = Path.cwd().parent.stem
     LMDB_DIR = ROOT_DIR / 'data' / cfg.dataset_name / 'lmdb'
+    EXTRA_LMDB_DIRS = [ROOT_DIR / 'data' / cfg.extra_dataset_name / 'lmdb']
     SAVE_DIR = ROOT_DIR / 'outputs' / project_name / exp_name
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -594,7 +611,7 @@ def main():
         # data
         train_indices, valid_indices = indices_per_fold[fold]['train'], indices_per_fold[fold]['valid']
         train_loader, valid_loader = prepare_dataloader(
-            cfg, LMDB_DIR, processor, train_indices, valid_indices)
+            cfg, LMDB_DIR, EXTRA_LMDB_DIRS, processor, train_indices, valid_indices)
 
         # loss_fn
         loss_fn = CrossEntropyWithWeightLoss(
