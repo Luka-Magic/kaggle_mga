@@ -548,8 +548,8 @@ def main():
     LMDB_DIR = ROOT_DIR / 'data' / cfg.dataset_name / 'lmdb'
     if cfg.extra_dataset_name is not None:
         EXTRA_LMDB_DIRS = [ROOT_DIR / 'data' / cfg.extra_dataset_name / 'lmdb']
-    else
-    EXTRA_LMDB_DIRS = None
+    else:
+        EXTRA_LMDB_DIRS = None
     SAVE_DIR = ROOT_DIR / 'outputs' / project_name / exp_name
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
