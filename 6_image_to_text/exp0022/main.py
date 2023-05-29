@@ -44,7 +44,7 @@ from torch.cuda.amp import autocast, GradScaler
 from transformers import AutoProcessor, Pix2StructForConditionalGeneration
 from transformers.optimization import Adafactor, get_cosine_schedule_with_warmup
 from transformers import PreTrainedTokenizerBase, PreTrainedModel
-from utils import seed_everything, AverageMeter, round_float, is_nan, get_lr, convert_num_to_2digits
+from utils import seed_everything, AverageMeter, round_float, is_nan, get_lr
 from metrics import validation_metrics
 
 
@@ -207,11 +207,8 @@ class MgaDataset(Dataset):
             x = d["x"]
             y = d["y"]
 
-            x = convert_num_to_2digits(x)
-            y = convert_num_to_2digits(y)
-
-            # x = round_float(x)
-            # y = round_float(y)
+            x = round_float(x)
+            y = round_float(y)
 
             # Ignore nan values
             if is_nan(x) or is_nan(y):
@@ -328,8 +325,6 @@ def prepare_dataloader(cfg, lmdb_dir, EXTRA_LMDB_DIRS, processor, train_indices,
                                     processor, 'train'))
 
     for extra_lmdb_dir in EXTRA_LMDB_DIRS:
-        if cfg.debug:
-            break
         train_ds_list.append(MgaDataset(cfg, extra_lmdb_dir, None,
                                         processor, 'train'))
 
@@ -641,7 +636,7 @@ def main():
                 best_score_dict = json.load(f)
                 start_epoch = best_score_dict[str(fold)]['epoch'] + 1
                 n_images = best_score_dict[str(fold)]['n_images']
-                # best_score = best_score_dict[str(fold)]['best_score']
+                best_score = best_score_dict[str(fold)]['best_score']
         else:
             n_images = 0
             start_epoch = 1
