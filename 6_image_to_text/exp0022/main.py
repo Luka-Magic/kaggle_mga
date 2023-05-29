@@ -228,8 +228,6 @@ class MgaDataset(Dataset):
 
         gt_string = BOS_TOKEN + data_str
 
-        print(gt_string)
-
         return gt_string, list(map(str, all_x)), list(map(str, all_y))
 
     def __len__(self):
@@ -331,10 +329,8 @@ def prepare_dataloader(cfg, lmdb_dir, EXTRA_LMDB_DIRS, processor, train_indices,
 
     for extra_lmdb_dir in EXTRA_LMDB_DIRS:
         if cfg.debug:
-            indices = list(range(100))
-        else:
-            indices = None
-        train_ds_list.append(MgaDataset(cfg, extra_lmdb_dir, indices,
+            break
+        train_ds_list.append(MgaDataset(cfg, extra_lmdb_dir, None,
                                         processor, 'train'))
 
     train_ds = ConcatDataset(train_ds_list)
