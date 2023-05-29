@@ -94,7 +94,7 @@ def write_cache(env, cache):
 def main():
     ROOT_DIR = Path.cwd().parents[2]
     EXP_NAME = Path.cwd().stem
-    RAW_DATA_DIR = ROOT_DIR / 'kaggle_dataset/generate_data/gen0000'
+    RAW_DATA_DIR = ROOT_DIR / 'kaggle_dataset/generate_data/gen0001'
     TRAIN_IMG_DIR = RAW_DATA_DIR / 'images'
     TRAIN_LABEL_DIR = RAW_DATA_DIR / 'annotations'
 

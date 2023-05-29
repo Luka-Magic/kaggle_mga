@@ -409,7 +409,7 @@ def main():
                     'valid_accuracy': valid_accuracy
                 })
         wandb.finish()
-        del model, train_loader, valid_loader, loss_fn, optimizer, scheduler, best_loss, best_accuracy
+        del model, train_loader, valid_loader, loss_fn, optimizer, scheduler, best_score
 
 
 if __name__ == '__main__':
