@@ -82,13 +82,16 @@ def convert_num_to_2digits(number):
 
 def convert_2digit_to_num(string):
     '''
-        123 => 1,2
-        584000 => 6,5
-        0.003 => 3,-3
-        -16.234 => -2,1
-        3 => 3,0
+        1,2 => 100
+        6,5 => 600000
+        3,-3 => 0.003
+        -2,1 => -20
+        3,0 => 3
     '''
-    digit1, digit2 = map(int, string.split(','))
+    two_digits = string.split(',')
+    if len(two_digits) != 2:
+        return 0
+    digit1, digit2 = map(int, two_digits)
     if digit1 == 0:
         return 0
 

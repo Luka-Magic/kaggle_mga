@@ -207,8 +207,11 @@ class MgaDataset(Dataset):
             x = d["x"]
             y = d["y"]
 
-            x = round_float(x)
-            y = round_float(y)
+            x = convert_num_to_2digits(x)
+            y = convert_num_to_2digits(y)
+
+            # x = round_float(x)
+            # y = round_float(y)
 
             # Ignore nan values
             if is_nan(x) or is_nan(y):
@@ -224,6 +227,8 @@ class MgaDataset(Dataset):
             + END
 
         gt_string = BOS_TOKEN + data_str
+
+        print(gt_string)
 
         return gt_string, list(map(str, all_x)), list(map(str, all_y))
 
@@ -325,7 +330,11 @@ def prepare_dataloader(cfg, lmdb_dir, EXTRA_LMDB_DIRS, processor, train_indices,
                                     processor, 'train'))
 
     for extra_lmdb_dir in EXTRA_LMDB_DIRS:
-        train_ds_list.append(MgaDataset(cfg, extra_lmdb_dir, None,
+        if cfg.debug:
+            indices = list(range(100))
+        else:
+            indices = None
+        train_ds_list.append(MgaDataset(cfg, extra_lmdb_dir, indices,
                                         processor, 'train'))
 
     train_ds = ConcatDataset(train_ds_list)
