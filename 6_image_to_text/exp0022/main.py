@@ -324,9 +324,10 @@ def prepare_dataloader(cfg, lmdb_dir, EXTRA_LMDB_DIRS, processor, train_indices,
     train_ds_list.append(MgaDataset(cfg, lmdb_dir, train_indices,
                                     processor, 'train'))
 
-    for extra_lmdb_dir in EXTRA_LMDB_DIRS:
-        train_ds_list.append(MgaDataset(cfg, extra_lmdb_dir, None,
-                                        processor, 'train'))
+    if EXTRA_LMDB_DIRS is not None:
+        for extra_lmdb_dir in EXTRA_LMDB_DIRS:
+            train_ds_list.append(MgaDataset(cfg, extra_lmdb_dir, None,
+                                            processor, 'train'))
 
     train_ds = ConcatDataset(train_ds_list)
 
