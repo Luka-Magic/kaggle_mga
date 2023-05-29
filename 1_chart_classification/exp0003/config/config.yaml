@@ -6,7 +6,7 @@ seed: 77
 n_epochs: 15
 split_method: StratifiedKFold
 n_folds: 5
-use_fold: [0, 1, 2, 3, 4] # [0, 1, 2, 3, 4]
+use_fold: [4] # [0, 1, 2, 3, 4]
 save_model: true
 use_amp: true
 
