@@ -3,7 +3,6 @@ from typing import List, Dict, Union, Tuple, Any
 import numpy as np
 import pandas as pd
 from polyleven import levenshtein
-from utils import convert_2digit_to_num
 
 BOS_TOKEN = "<|BOS|>"
 START = "<|start|>"
@@ -206,8 +205,8 @@ def string2triplet(pred_string: str) -> Tuple[str, List[str], List[str]]:
         if '|' in data:
             data_split = data.split('|')
             if len(data_split) >= 2:
-                x.append(convert_2digit_to_num(data_split[0]))
-                y.append(convert_2digit_to_num(data_split[1]))
+                x.append(data_split[0])
+                y.append(data_split[1])
             else:
                 print(f'\n    check data: {data}')
 
