@@ -188,7 +188,7 @@ def string2triplet(pred_string: str) -> Tuple[str, List[str], List[str]]:
         Tuple[str, List[str], List[str]]: A triplet of chart type, x values, and y values.
     """
 
-    chart_type = "scatter"
+    chart_type = ""
     # for tok in CHART_TYPE_TOKENS:
     #     if tok in pred_string:
     #         chart_type = tok.strip("<>")
