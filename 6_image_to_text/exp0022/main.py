@@ -214,7 +214,7 @@ def split_extra_data(cfg, extra_train_dirs, extra_valid_dirs):
         else:
             lmdb_dir = extra_valid_dir / 'valid' / 'lmdb'
 
-        extra_train_info[dataset_name]['lmdb_dir'] = lmdb_dir
+        extra_valid_info[dataset_name]['lmdb_dir'] = lmdb_dir
 
         valid_info = {
             'chart_type': [],
