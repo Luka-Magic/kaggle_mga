@@ -548,11 +548,7 @@ def train_valid_one_epoch(
             # valid
             valid_score = valid_function(cfg, epoch, valid_loader,
                                          processor, model, device, gt_df)
-            extra_valid_scores = {}
-            for dataset_name, extra_valid_loader in extra_valid_loader_dict.items():
-                extra_valid_scores[dataset_name] = valid_function(cfg, epoch, extra_valid_loader,
-                                                                  processor, model, device, gt_df)
-            model.train()
+
             valid_count_per_epoch += 1
             print("\n" + "=" * 80)
             print(
@@ -563,12 +559,17 @@ def train_valid_one_epoch(
             for valid_score_name, valid_score_value in valid_score.items():
                 print(
                     f'            {valid_score_name}: {valid_score_value:.6f}')
-            for dataset_name, extra_valid_score in extra_valid_scores.items():
+            extra_valid_scores = {}
+            for dataset_name, extra_valid_loader in extra_valid_loader_dict.items():
+                extra_valid_scores[dataset_name] = valid_function(cfg, epoch, extra_valid_loader,
+                                                                  processor, model, device, gt_df)
+                # for dataset_name, extra_valid_score in extra_valid_scores.items():
                 print(f'    EXTRA VALID - {dataset_name}:')
-                for valid_score_name, valid_score_value in extra_valid_score.items():
+                for valid_score_name, valid_score_value in extra_valid_scores[dataset_name].items():
                     print(
                         f'            {valid_score_name}: {valid_score_value:.6f}')
             print("=" * 80)
+            model.train()
 
             # log
             if cfg.use_wandb:
