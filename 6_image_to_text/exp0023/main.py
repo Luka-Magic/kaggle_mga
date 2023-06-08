@@ -58,7 +58,21 @@ SEPARATOR_TOKENS = [
     END
 ]
 
-new_tokens = SEPARATOR_TOKENS
+# LINE_TOKEN = "<line>"
+# VERTICAL_BAR_TOKEN = "<vertical_bar>"
+# HORIZONTAL_BAR_TOKEN = "<horizontal_bar>"
+# SCATTER_TOKEN = "<scatter>"
+# DOT_TOKEN = "<dot>"
+
+# CHART_TYPE_TOKENS = [
+#     LINE_TOKEN,
+#     VERTICAL_BAR_TOKEN,
+#     HORIZONTAL_BAR_TOKEN,
+#     SCATTER_TOKEN,
+#     DOT_TOKEN,
+# ]
+
+new_tokens = SEPARATOR_TOKENS  # + CHART_TYPE_TOKENS
 
 CHART_TYPE2LABEL = {
     'line': 0,
@@ -114,7 +128,7 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
             label = txn.get(label_key).decode('utf-8')
         json_dict = json.loads(label)
 
-        if json_dict['chart-type'] not in cfg.chart_types:
+        if json_dict['chart-type'] == 'scatter':
             continue
 
         label_source = json_dict['source']
@@ -166,99 +180,7 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
     return indices_dict
 
 
-def split_extra_data(cfg, extra_train_dirs, extra_valid_dirs):
-    """
-    Returns:
-        extra_train_info (Dict[int, Dict[str, List[int]]]): A dictionary containing train indices of each fold.
-            Example: {dataset_name: {'lmdb_dir': Path, 'train': [0, 1, 4, ...]}, ...}
-        extra_valid_info (Dict[int, Dict[str, List[int]]]): A dictionary containing valid indices of each fold.
-            Example: {dataset_name: {'lmdb_dir': Path, 'valid': [5, 7, ....], 'gt_df': a dataFrame}, ...}
-    """
-
-    extra_train_info = {}  # key: dataset, value: {'train': []}
-    extra_valid_info = {}  # key: dataset, value: {'valid': [], 'gt_df': pd.DataFrame}
-
-    # train
-    for extra_train_dir in extra_train_dirs:
-        dataset_name = extra_train_dir.stem
-        extra_train_info[dataset_name] = {'train': []}
-        if (extra_train_dir / 'lmdb').exists():
-            lmdb_dir = extra_train_dir / 'lmdb'
-        else:
-            lmdb_dir = extra_train_dir / 'train' / 'lmdb'
-
-        extra_train_info[dataset_name]['lmdb_dir'] = lmdb_dir
-        env = lmdb.open(str(lmdb_dir), max_readers=32,
-                        readonly=True, lock=False, readahead=False, meminit=False)
-        with env.begin(write=False) as txn:
-            n_samples = int(txn.get('num-samples'.encode()))
-
-        for idx in tqdm(range(n_samples), total=n_samples):
-            with env.begin(write=False) as txn:
-                # load json
-                label_key = f'label-{str(idx+1).zfill(8)}'.encode()
-                label = txn.get(label_key).decode('utf-8')
-            json_dict = json.loads(label)
-
-            if json_dict['chart-type'] not in cfg.chart_types:
-                continue
-
-            extra_train_info[dataset_name]['train'].append(idx)
-
-    # valid
-    for extra_valid_dir in extra_valid_dirs:
-        dataset_name = extra_valid_dir.stem
-        extra_valid_info[dataset_name] = {'valid': []}
-        if (extra_valid_dir / 'lmdb').exists():
-            lmdb_dir = extra_valid_dir / 'lmdb'
-        else:
-            lmdb_dir = extra_valid_dir / 'valid' / 'lmdb'
-
-        extra_train_info[dataset_name]['lmdb_dir'] = lmdb_dir
-
-        valid_info = {
-            'chart_type': [],
-            'id': [],
-            'x': [],
-            'y': [],
-        }
-        env = lmdb.open(str(lmdb_dir), max_readers=32,
-                        readonly=True, lock=False, readahead=False, meminit=False)
-        with env.begin(write=False) as txn:
-            n_samples = int(txn.get('num-samples'.encode()))
-
-        for idx in tqdm(range(n_samples), total=n_samples):
-            with env.begin(write=False) as txn:
-                # load json
-                label_key = f'label-{str(idx+1).zfill(8)}'.encode()
-                label = txn.get(label_key).decode('utf-8')
-            json_dict = json.loads(label)
-
-            if json_dict['chart-type'] not in cfg.chart_types:
-                continue
-
-            valid_info['chart_type'].append(json_dict['chart-type'])
-            xs, ys = [], []
-            for data_series_dict in json_dict['data-series']:
-                xs.append(data_series_dict['x'])
-                ys.append(data_series_dict['y'])
-            valid_info['id'].append(json_dict['id'])
-            valid_info['x'].append(xs)
-            valid_info['y'].append(ys)
-
-            extra_valid_info[dataset_name]['valid'].append(idx)
-
-        gt_df = pd.DataFrame(
-            index=[f"{id_}_x" for id_ in valid_info['id']] +
-            [f"{id_}_y" for id_ in valid_info['id']],
-            data={
-                "data_series": valid_info['x'] + valid_info['y'],
-                "chart_type": valid_info['chart_type'] * 2,
-            })
-        extra_valid_info[dataset_name]['gt_df'] = gt_df
-    return extra_train_info, extra_valid_info
-
-
+# Dataset
 class MgaDataset(Dataset):
     def __init__(self, cfg, lmdb_dir, indices, processor, phase):
         self.cfg = cfg
@@ -397,35 +319,22 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
 # Dataloader
 
 
-def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices, extra_train_info, extra_valid_info):
-    # dataset
-    # train
+def prepare_dataloader(cfg, lmdb_dir, EXTRA_LMDB_DIRS, processor, train_indices, valid_indices):
     train_ds_list = []
     train_ds_list.append(MgaDataset(cfg, lmdb_dir, train_indices,
                                     processor, 'train'))
 
-    for dataset_info in extra_train_info.values():
-        extra_lmdb_dir = dataset_info['lmdb_dir']
-        extra_train_indices = dataset_info['train']
-        train_ds_list.append(MgaDataset(cfg, extra_lmdb_dir, extra_train_indices,
+    for extra_lmdb_dir in EXTRA_LMDB_DIRS:
+        train_ds_list.append(MgaDataset(cfg, extra_lmdb_dir, None,
                                         processor, 'train'))
-    concat_train_ds = ConcatDataset(train_ds_list)
 
-    # valid
-    extra_valid_ds_dict = {}
+    train_ds = ConcatDataset(train_ds_list)
+
     valid_ds = MgaDataset(cfg, lmdb_dir, valid_indices,
                           processor, 'valid')
 
-    for dataset_name, dataset_info in extra_valid_info.items():
-        extra_lmdb_dir = dataset_info['lmdb_dir']
-        extra_valid_indices = dataset_info['valid']
-        extra_valid_ds_dict[dataset_name] = MgaDataset(cfg, extra_lmdb_dir, extra_valid_indices,
-                                                       processor, 'valid')
-
-    # dataloader
-    # train
     train_loader = DataLoader(
-        concat_train_ds,
+        train_ds,
         batch_size=cfg.train_bs,
         shuffle=True,
         num_workers=cfg.num_workers,
@@ -433,7 +342,6 @@ def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices, e
         collate_fn=collate_fn
     )
 
-    # valid
     valid_loader = DataLoader(
         valid_ds,
         batch_size=cfg.valid_bs,
@@ -442,18 +350,7 @@ def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices, e
         pin_memory=True,
         collate_fn=collate_fn
     )
-
-    extra_valid_loader_dict = {}
-    for dataset_name, extra_valid_ds in extra_valid_ds_dict.items():
-        extra_valid_loader_dict[dataset_name] = DataLoader(
-            extra_valid_ds,
-            batch_size=cfg.valid_bs,
-            shuffle=False,
-            num_workers=cfg.num_workers,
-            pin_memory=True,
-            collate_fn=collate_fn
-        )
-    return train_loader, valid_loader, extra_valid_loader_dict
+    return train_loader, valid_loader
 
 
 # custom loss
@@ -490,7 +387,6 @@ def train_valid_one_epoch(
     save_dir: Path,
     train_loader: DataLoader,
     valid_loader: DataLoader,
-    extra_valid_loader_dict: Dict[str, DataLoader],
     processor: PreTrainedTokenizerBase,
     model: PreTrainedModel,
     loss_fn,
@@ -543,15 +439,17 @@ def train_valid_one_epoch(
         pbar.set_description(
             f'[TRAIN epoch {epoch}/{cfg.n_epochs} ({valid_count_per_epoch}/{cfg.n_valid_per_epoch})]')
         pbar.set_postfix(OrderedDict(loss=train_losses.avg))
+        # if cfg.use_wandb:
+        #     wandb.log({
+        #         'n_images': n_images,
+        #         'train_loss': loss.item(),
+        #         'lr': lr
+        #     })
 
         if step % (len(train_loader) // cfg.n_valid_per_epoch) == 0:
             # valid
             valid_score = valid_function(cfg, epoch, valid_loader,
                                          processor, model, device, gt_df)
-            extra_valid_scores = {}
-            for dataset_name, extra_valid_loader in extra_valid_loader_dict.items():
-                extra_valid_scores[dataset_name] = valid_function(cfg, epoch, extra_valid_loader,
-                                                                  processor, model, device, gt_df)
             model.train()
             valid_count_per_epoch += 1
             print("\n" + "=" * 80)
@@ -563,11 +461,6 @@ def train_valid_one_epoch(
             for valid_score_name, valid_score_value in valid_score.items():
                 print(
                     f'            {valid_score_name}: {valid_score_value:.6f}')
-            for dataset_name, extra_valid_score in extra_valid_scores.items():
-                print(f'    EXTRA VALID - {dataset_name}:')
-                for valid_score_name, valid_score_value in extra_valid_score.items():
-                    print(
-                        f'            {valid_score_name}: {valid_score_value:.6f}')
             print("=" * 80)
 
             # log
@@ -658,12 +551,7 @@ def main():
     exp_name = EXP_PATH.name
     project_name = Path.cwd().parent.stem
     LMDB_DIR = ROOT_DIR / 'data' / cfg.dataset_name / 'lmdb'
-    EXTRA_TRAIN_DIRS = []
-    EXTRA_VALID_DIRS = []
-    for extra_train_dir in cfg.extra_train_datasets:
-        EXTRA_TRAIN_DIRS.append(ROOT_DIR / 'data' / extra_train_dir)
-    for extra_valid_dir in cfg.extra_valid_datasets:
-        EXTRA_VALID_DIRS.append(ROOT_DIR / 'data' / extra_valid_dir)
+    EXTRA_LMDB_DIRS = [ROOT_DIR / 'data' / cfg.extra_dataset_name / 'lmdb']
     SAVE_DIR = ROOT_DIR / 'outputs' / project_name / exp_name
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -674,8 +562,6 @@ def main():
 
     device = torch.device('cuda') if torch.cuda.is_available() else 'cpu'
     indices_per_fold = split_data(cfg, LMDB_DIR)
-    extra_train_info, extra_valid_info = split_extra_data(
-        cfg, EXTRA_TRAIN_DIRS, EXTRA_VALID_DIRS)
 
     for fold in cfg.use_fold:
         if cfg.use_wandb:
@@ -709,7 +595,7 @@ def main():
             str(pretrained_path)).to(device)
         model.decoder.resize_token_embeddings(len(processor.tokenizer))
         model.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids([
-            BOS_TOKEN])[0]
+                                                                                 BOS_TOKEN])[0]
 
         print(f'load model: {str(pretrained_path)}')
         if cfg.restart:
@@ -724,8 +610,8 @@ def main():
 
         # data
         train_indices, valid_indices = indices_per_fold[fold]['train'], indices_per_fold[fold]['valid']
-        train_loader, valid_loader, extra_valid_loader_dict = prepare_dataloader(
-            cfg, LMDB_DIR, processor, train_indices, valid_indices, extra_train_info, extra_valid_info)
+        train_loader, valid_loader = prepare_dataloader(
+            cfg, LMDB_DIR, EXTRA_LMDB_DIRS, processor, train_indices, valid_indices)
 
         # loss_fn
         loss_fn = CrossEntropyWithWeightLoss(
@@ -756,7 +642,7 @@ def main():
                 best_score_dict = json.load(f)
                 start_epoch = best_score_dict[str(fold)]['epoch'] + 1
                 n_images = best_score_dict[str(fold)]['n_images']
-                best_score = best_score_dict[str(fold)]['best_score']
+                # best_score = best_score_dict[str(fold)]['best_score']
         else:
             n_images = 0
             start_epoch = 1
@@ -764,7 +650,7 @@ def main():
 
         for epoch in range(start_epoch, cfg.n_epochs + 1):
             train_valid_one_epoch(
-                cfg, fold, epoch, SAVE_DIR, train_loader, valid_loader, extra_valid_loader_dict, processor, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, indices_per_fold[fold]['gt_df'])
+                cfg, fold, epoch, SAVE_DIR, train_loader, valid_loader, processor, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, indices_per_fold[fold]['gt_df'])
     wandb.finish()
     del model, processor, train_loader, valid_loader, train_indices, valid_indices, optimizer, scaler
 

@@ -1,0 +1,18 @@
+kvs_embed_path: glove/glove.6B.50d.txt
+categorical_json_path: my-benetech-data/categoricals.json
+labels_csv_path: my-benetech-data/labels.csv
+
+vertical_bar:
+  n: 10000
+
+horizontal_bar:
+  n: 10000
+
+line:
+  n: 10000
+
+scatter:
+  n: 10000
+
+dot:
+  n: 10000
