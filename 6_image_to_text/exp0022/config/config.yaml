@@ -3,7 +3,7 @@ debug: false
 use_wandb: false
 wandb_project: kaggle_mga_image2text
 dataset_name: data0004
-extra_train_datasets: [data0005]
+extra_train_datasets: [data0005, data0006]
 extra_valid_datasets: [data0006, data0007]
 chart_types: [scatter]
 seed: 77
@@ -13,7 +13,7 @@ n_folds: 5
 use_fold: [0] # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 save_model: true
 use_amp: true
-n_valid_per_epoch: 1000
+n_valid_per_epoch: 5
 
 #####   Model   ######################################
 restart: true
