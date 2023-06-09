@@ -398,8 +398,8 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
 
 
 def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices, extra_train_info, extra_valid_info):
-    # dataset
     # train
+    # dataset
     train_ds_list = []
     train_ds_list.append(MgaDataset(cfg, lmdb_dir, train_indices,
                                     processor, 'train'))
@@ -410,20 +410,7 @@ def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices, e
         train_ds_list.append(MgaDataset(cfg, extra_lmdb_dir, extra_train_indices,
                                         processor, 'train'))
     concat_train_ds = ConcatDataset(train_ds_list)
-
-    # valid
-    extra_valid_ds_dict = {}
-    valid_ds = MgaDataset(cfg, lmdb_dir, valid_indices,
-                          processor, 'valid')
-
-    for dataset_name, dataset_info in extra_valid_info.items():
-        extra_lmdb_dir = dataset_info['lmdb_dir']
-        extra_valid_indices = dataset_info['valid']
-        extra_valid_ds_dict[dataset_name] = MgaDataset(cfg, extra_lmdb_dir, extra_valid_indices,
-                                                       processor, 'valid')
-
     # dataloader
-    # train
     train_loader = DataLoader(
         concat_train_ds,
         batch_size=cfg.train_bs,
@@ -434,6 +421,9 @@ def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices, e
     )
 
     # valid
+    # dataset
+    valid_ds = MgaDataset(cfg, lmdb_dir, valid_indices,
+                          processor, 'valid')
     valid_loader = DataLoader(
         valid_ds,
         batch_size=cfg.valid_bs,
@@ -443,9 +433,14 @@ def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices, e
         collate_fn=collate_fn
     )
 
-    extra_valid_loader_dict = {}
-    for dataset_name, extra_valid_ds in extra_valid_ds_dict.items():
-        extra_valid_loader_dict[dataset_name] = DataLoader(
+    extra_valid_dict = {}
+    for dataset_name, dataset_info in extra_valid_info.items():
+        extra_lmdb_dir = dataset_info['lmdb_dir']
+        extra_valid_indices = dataset_info['valid']
+        extra_gt_df = dataset_info['gt_df']
+        extra_valid_ds = MgaDataset(
+            cfg, extra_lmdb_dir, extra_valid_indices, processor, 'valid')
+        extra_valid_loader = DataLoader(
             extra_valid_ds,
             batch_size=cfg.valid_bs,
             shuffle=False,
@@ -453,7 +448,12 @@ def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices, e
             pin_memory=True,
             collate_fn=collate_fn
         )
-    return train_loader, valid_loader, extra_valid_loader_dict
+        extra_valid_dict[dataset_name] = {
+            'valid_loader':  extra_valid_loader,
+            'gt_df': extra_gt_df
+        }
+
+    return train_loader, valid_loader, extra_valid_dict
 
 
 # custom loss
@@ -490,7 +490,8 @@ def train_valid_one_epoch(
     save_dir: Path,
     train_loader: DataLoader,
     valid_loader: DataLoader,
-    extra_valid_loader_dict: Dict[str, DataLoader],
+    gt_df: pd.DataFrame,
+    extra_valid_dict: Dict[str, DataLoader],
     processor: PreTrainedTokenizerBase,
     model: PreTrainedModel,
     loss_fn,
@@ -499,7 +500,6 @@ def train_valid_one_epoch(
     scheduler: torch.optim.lr_scheduler,
     scheduler_step_time: str,
     scaler: torch.cuda.amp.GradScaler,
-    gt_df: pd.DataFrame
 ):
     global best_score, n_images
 
@@ -560,9 +560,9 @@ def train_valid_one_epoch(
                 print(
                     f'            {valid_score_name}: {valid_score_value:.6f}')
             extra_valid_scores = {}
-            for dataset_name, extra_valid_loader in extra_valid_loader_dict.items():
-                extra_valid_scores[dataset_name] = valid_function(cfg, epoch, extra_valid_loader,
-                                                                  processor, model, device, gt_df)
+            for dataset_name, extra_valid in extra_valid_dict.items():
+                extra_valid_scores[dataset_name] = valid_function(cfg, epoch, extra_valid['valid_loader'],
+                                                                  processor, model, device, extra_valid['gt_df'])
                 # for dataset_name, extra_valid_score in extra_valid_scores.items():
                 print(f'    EXTRA VALID - {dataset_name}:')
                 for valid_score_name, valid_score_value in extra_valid_scores[dataset_name].items():
@@ -725,7 +725,7 @@ def main():
 
         # data
         train_indices, valid_indices = indices_per_fold[fold]['train'], indices_per_fold[fold]['valid']
-        train_loader, valid_loader, extra_valid_loader_dict = prepare_dataloader(
+        train_loader, valid_loader, extra_valid_dict = prepare_dataloader(
             cfg, LMDB_DIR, processor, train_indices, valid_indices, extra_train_info, extra_valid_info)
 
         # loss_fn
@@ -765,7 +765,7 @@ def main():
 
         for epoch in range(start_epoch, cfg.n_epochs + 1):
             train_valid_one_epoch(
-                cfg, fold, epoch, SAVE_DIR, train_loader, valid_loader, extra_valid_loader_dict, processor, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, indices_per_fold[fold]['gt_df'])
+                cfg, fold, epoch, SAVE_DIR, train_loader, valid_loader, indices_per_fold[fold]['gt_df'], extra_valid_dict, processor, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
     wandb.finish()
     del model, processor, train_loader, valid_loader, train_indices, valid_indices, optimizer, scaler
 
