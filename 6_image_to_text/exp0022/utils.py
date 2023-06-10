@@ -4,6 +4,7 @@ import torch
 import warnings
 from typing import List, Dict, Union, Tuple, Any
 import math
+from .metrics import normalized_rmse
 
 
 def seed_everything(seed):
@@ -60,47 +61,6 @@ def round_float(value: Union[int, float, str]) -> Union[str, float]:
     return value
 
 
-def convert_num_to_2digits(number):
-    '''
-        123 => 1,2
-        584000 => 6,5
-        0.003 => 3,-3
-        -16.234 => -2,1
-        3 => 3,0
-    '''
-    if number == 0:
-        return [0, 0]
-
-    sign = int(math.copysign(1, number))
-    magnitude = abs(number)
-
-    digit1 = math.floor(math.log10(magnitude))
-    digit2 = round(magnitude / 10**digit1)
-
-    return f'{sign * digit2},{digit1}'
-
-
-def convert_2digit_to_num(string):
-    '''
-        1,2 => 100
-        6,5 => 600000
-        3,-3 => 0.003
-        -2,1 => -20
-        3,0 => 3
-    '''
-    two_digits = string.split(',')
-    if len(two_digits) != 2:
-        return 0
-    digit1, digit2 = map(int, two_digits)
-    if digit1 == 0:
-        return 0
-
-    sign = int(math.copysign(1, digit1))
-    magnitude = abs(digit1) * 10**digit2
-
-    return sign * magnitude
-
-
 def is_nan(value: Union[int, float, str]) -> bool:
     """
     Check if a value is NaN (not a number).
@@ -112,6 +72,19 @@ def is_nan(value: Union[int, float, str]) -> bool:
         bool: True if the value is NaN, False otherwise
     """
     return isinstance(value, float) and np.isnan(value)
+
+
+def reduce_precision(arr):
+    for i in range(-7, 7):
+        # Round array
+        prec = np.round(arr, decimals=i)
+        if i <= 0:
+            prec = prec.astype(int)
+        prec = list(prec)
+        # Check if nrmse is close enough
+        if normalized_rmse(arr, prec) >= 0.96:
+            return prec
+    return arr
 
 
 def get_lr(optimizer):

@@ -44,7 +44,7 @@ from torch.cuda.amp import autocast, GradScaler
 from transformers import AutoProcessor, Pix2StructForConditionalGeneration
 from transformers.optimization import Adafactor, get_cosine_schedule_with_warmup
 from transformers import PreTrainedTokenizerBase, PreTrainedModel
-from utils import seed_everything, AverageMeter, round_float, is_nan, get_lr
+from utils import seed_everything, AverageMeter, is_nan, get_lr, reduce_precision
 from metrics import validation_metrics
 
 
@@ -285,8 +285,8 @@ class MgaDataset(Dataset):
             x = d["x"]
             y = d["y"]
 
-            x = round_float(x)
-            y = round_float(y)
+            # x = round_float(x)
+            # y = round_float(y)
 
             # Ignore nan values
             if is_nan(x) or is_nan(y):
@@ -294,6 +294,12 @@ class MgaDataset(Dataset):
 
             all_x.append(x)
             all_y.append(y)
+
+        if self.phase == 'train':
+            if not isinstance(all_x[0], str):
+                all_x = reduce_precision(all_x)
+            if not isinstance(all_y[0], str):
+                all_y = reduce_precision(all_y)
 
         # chart_type = f"<{json_dict['chart-type']}>"
         data_str = \

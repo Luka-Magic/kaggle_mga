@@ -6,6 +6,7 @@ import re
 import cv2
 import numpy as np
 import pandas as pd
+from operator import itemgetter
 
 
 def check_ann(ann):
@@ -30,10 +31,18 @@ def ann2json(ann, id_, chart_type, img_path):
     h, w, _ = cv2.imread(str(img_path)).shape
     json_dict['image-size'] = {'height': h, 'width': w}
 
-    json_dict['data-series'] = ann['task6']['output']['data series'][0]['data']
+    raw_data_series = ann['task6']['output']['data series'][0]['data']
+    data_series = []
+    for data_dict in raw_data_series:
+        if 'x' not in data_dict or 'y' not in data_dict:
+            continue
+        data_series.append(data_dict)
+
+    json_dict['data-series'] = sorted(data_series, key=itemgetter('x', 'y'))
+
     json_dict['chart-type'] = chart_type
     json_dict['count'] = len(ann['task6']['output']['data series'][0]['data'])
-    json_dict['source'] = 'icdar'
+    json_dict['source'] = 'icdar2022'
     return json_dict
 
 
