@@ -4,7 +4,7 @@ import torch
 import warnings
 from typing import List, Dict, Union, Tuple, Any
 import math
-from .metrics import normalized_rmse
+from metrics import normalized_rmse
 
 
 def seed_everything(seed):
