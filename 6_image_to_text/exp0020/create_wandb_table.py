@@ -128,6 +128,9 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
         json_dict = json.loads(label)
 
         label_source = json_dict['source']
+        chart_type = json_dict['chart-type']
+        if chart_type != 'scatter':
+            continue
 
         if label_source == 'extracted':
             extracted_indices.append(idx)
