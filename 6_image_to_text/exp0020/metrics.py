@@ -107,8 +107,6 @@ def score_series(
     """
     notna_y_true = []
     notna_y_pred = []
-    print(len(y_true))
-    print(len(y_pred))
     for i, y in enumerate(y_true):
         if isinstance(y, float) and np.isnan(y):
             continue
@@ -158,7 +156,7 @@ def benetech_score(ground_truth: pd.DataFrame, predictions: pd.DataFrame) -> flo
         n_chart_type += 1
         if gt_type != pred_type:  # Check chart_type condition
             score = 0.0
-        elif len(gt_type) != len(pred_type):
+        elif len(gt_series) != len(pred_series):
             chart_type_correct += 1
             score = 0.0  # Score with RMSE or Levenshtein as appropriate
         else:
