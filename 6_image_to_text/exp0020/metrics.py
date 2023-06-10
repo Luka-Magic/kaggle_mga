@@ -107,6 +107,8 @@ def score_series(
     """
     notna_y_true = []
     notna_y_pred = []
+    print(len(y_true))
+    print(len(y_pred))
     for i, y in enumerate(y_true):
         if isinstance(y, float) and np.isnan(y):
             continue
