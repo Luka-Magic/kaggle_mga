@@ -153,6 +153,7 @@ def benetech_score(ground_truth: pd.DataFrame, predictions: pd.DataFrame) -> flo
     n_point_correct = 0
     chart_type_correct = 0
     for (gt_series, gt_type), (pred_series, pred_type) in pairs:
+        pred_type = gt_type
         n_chart_type += 1
         if gt_type != pred_type:  # Check chart_type condition
             score = 0.0
