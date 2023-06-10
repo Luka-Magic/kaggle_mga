@@ -156,7 +156,7 @@ def benetech_score(ground_truth: pd.DataFrame, predictions: pd.DataFrame) -> flo
         n_chart_type += 1
         if gt_type != pred_type:  # Check chart_type condition
             score = 0.0
-        elif len(gt_type) != len(pred_type):
+        elif len(gt_series) != len(pred_series):
             chart_type_correct += 1
             score = 0.0  # Score with RMSE or Levenshtein as appropriate
         else:
@@ -262,14 +262,11 @@ def validation_metrics(val_outputs: List[str], val_ids: List[str], gt_df: pd.Dat
         }
     )
 
-    overall_score, chart_type2score, scores, chart_type_acc = benetech_score(
+    overall_score, chart_type2score, scores, chart_type_acc, n_point_acc = benetech_score(
         gt_df.loc[pred_df.index.values], pred_df
     )
     # scores: pred_dfの順に並ぶ
-
     pred_list_for_table = []
-    # scores: 2 * n_data
-    # id_: n_data
     for (id_, (chart_type, x, y), score) in zip(val_ids, pred_triplets, scores):
         pred_list_for_table.append(
             {'id': id_, 'x': x, 'y': y, 'chart_type': chart_type, 'score': score})
@@ -277,5 +274,6 @@ def validation_metrics(val_outputs: List[str], val_ids: List[str], gt_df: pd.Dat
     return {
         "valid_score": overall_score,
         "chart_acc": chart_type_acc,
+        'n_point_acc': n_point_acc,
         **{f"{k}_score": v for k, v in chart_type2score.items()},
     }, pred_list_for_table
