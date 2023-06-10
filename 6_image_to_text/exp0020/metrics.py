@@ -267,6 +267,8 @@ def validation_metrics(val_outputs: List[str], val_ids: List[str], gt_df: pd.Dat
         gt_df.loc[pred_df.index.values], pred_df
     )
     # scores: pred_dfの順に並ぶ
+    print(len(val_ids))
+    print(len(scores))
 
     pred_list_for_table = []
     for (id_, (chart_type, x, y), score) in zip(val_ids, pred_triplets, scores):

@@ -375,7 +375,7 @@ def valid_function(
 
     scores, pred_list = validation_metrics(outputs, ids, gt_df)
     finish_time = time.time()
-    scores['valid_time'] = f'{(finish_time - start_time):.1f}s'
+    scores['valid_time'] = finish_time - start_time
     create_wandb_table(table_info_list, pred_list, scores)
     return scores
 
