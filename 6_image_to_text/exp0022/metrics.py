@@ -248,8 +248,6 @@ def validation_metrics(val_outputs: List[str], val_ids: List[str], gt_df: pd.Dat
             pred_triplets.append(string2triplet(example_output))
             # <?_start> ~ <?_end>までをx, yそれぞれ切り取り;でsplitしてlist化, 短い方の長さに揃える。
             # Tuple(chart_type, x, y)
-    print(len(gt_df))
-    print(len(val_ids))
     pred_df = pd.DataFrame(
         index=[f"{id_}_x" for id_ in val_ids] +
         [f"{id_}_y" for id_ in val_ids],
