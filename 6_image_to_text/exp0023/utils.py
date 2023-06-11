@@ -3,6 +3,8 @@ import numpy as np
 import torch
 import warnings
 from typing import List, Dict, Union, Tuple, Any
+import math
+from metrics import normalized_rmse
 
 
 def seed_everything(seed):
@@ -70,6 +72,19 @@ def is_nan(value: Union[int, float, str]) -> bool:
         bool: True if the value is NaN, False otherwise
     """
     return isinstance(value, float) and np.isnan(value)
+
+
+def reduce_precision(arr):
+    for i in range(-7, 7):
+        # Round array
+        prec = np.round(arr, decimals=i)
+        if i <= 0:
+            prec = prec.astype(int)
+        prec = list(prec)
+        # Check if nrmse is close enough
+        if normalized_rmse(arr, prec) >= 0.96:
+            return prec
+    return arr
 
 
 def get_lr(optimizer):

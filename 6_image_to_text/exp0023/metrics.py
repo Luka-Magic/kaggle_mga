@@ -105,8 +105,6 @@ def score_series(
     Returns:
         float: The score for the series.
     """
-    if len(y_true) != len(y_pred):
-        return 0.0
     notna_y_true = []
     notna_y_pred = []
     for i, y in enumerate(y_true):
@@ -152,13 +150,19 @@ def benetech_score(ground_truth: pd.DataFrame, predictions: pd.DataFrame) -> flo
     )
     scores = []
     n_chart_type = 0
+    n_point_correct = 0
     chart_type_correct = 0
     for (gt_series, gt_type), (pred_series, pred_type) in pairs:
+        pred_type = gt_type
         n_chart_type += 1
         if gt_type != pred_type:  # Check chart_type condition
             score = 0.0
-        else:  # Score with RMSE or Levenshtein as appropriate
+        elif len(gt_series) != len(pred_series):
             chart_type_correct += 1
+            score = 0.0  # Score with RMSE or Levenshtein as appropriate
+        else:
+            chart_type_correct += 1
+            n_point_correct += 1
             score = score_series(gt_series, pred_series)
         scores.append(score)
 
@@ -173,8 +177,9 @@ def benetech_score(ground_truth: pd.DataFrame, predictions: pd.DataFrame) -> flo
     }
 
     chart_type_acc = chart_type_correct / n_chart_type
+    n_point_acc = n_point_correct / n_chart_type
 
-    return np.mean(scores), chart_type2score, scores, chart_type_acc
+    return np.mean(scores), chart_type2score, scores, chart_type_acc, n_point_acc
 
 
 def string2triplet(pred_string: str) -> Tuple[str, List[str], List[str]]:
@@ -188,7 +193,7 @@ def string2triplet(pred_string: str) -> Tuple[str, List[str], List[str]]:
         Tuple[str, List[str], List[str]]: A triplet of chart type, x values, and y values.
     """
 
-    chart_type = "scatter"
+    chart_type = ""
     # for tok in CHART_TYPE_TOKENS:
     #     if tok in pred_string:
     #         chart_type = tok.strip("<>")
@@ -248,7 +253,6 @@ def validation_metrics(val_outputs: List[str], val_ids: List[str], gt_df: pd.Dat
             pred_triplets.append(string2triplet(example_output))
             # <?_start> ~ <?_end>までをx, yそれぞれ切り取り;でsplitしてlist化, 短い方の長さに揃える。
             # Tuple(chart_type, x, y)
-
     pred_df = pd.DataFrame(
         index=[f"{id_}_x" for id_ in val_ids] +
         [f"{id_}_y" for id_ in val_ids],
@@ -259,11 +263,10 @@ def validation_metrics(val_outputs: List[str], val_ids: List[str], gt_df: pd.Dat
         }
     )
 
-    overall_score, chart_type2score, scores, chart_type_acc = benetech_score(
+    overall_score, chart_type2score, scores, chart_type_acc, n_point_acc = benetech_score(
         gt_df.loc[pred_df.index.values], pred_df
     )
     # scores: pred_dfの順に並ぶ
-
     pred_list_for_table = []
     for (id_, (chart_type, x, y), score) in zip(val_ids, pred_triplets, scores):
         pred_list_for_table.append(
@@ -272,5 +275,6 @@ def validation_metrics(val_outputs: List[str], val_ids: List[str], gt_df: pd.Dat
     return {
         "valid_score": overall_score,
         "chart_acc": chart_type_acc,
+        'n_point_acc': n_point_acc,
         **{f"{k}_score": v for k, v in chart_type2score.items()},
     }, pred_list_for_table
