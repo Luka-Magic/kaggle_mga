@@ -45,7 +45,7 @@ from pose_resnet import get_pose_net
 from loss import CenterLoss
 
 
-thresholds = np.arange(0.025, 0.5, 0.025).tolist()
+thresholds = np.round(np.arange(0.025, 0.525, 0.025), 4).tolist()
 wandb_thr = 0.25
 
 
@@ -57,7 +57,6 @@ def split_data(cfg, lmdb_dir):
     with env.begin(write=False) as txn:
         n_samples = int(txn.get('num-samples'.encode()))
 
-    c = 0
     labels = []
     indices = []
     # check data
@@ -70,9 +69,6 @@ def split_data(cfg, lmdb_dir):
         if json_dict['chart-type'] != 'scatter':
             continue
         indices.append(idx)
-        c += 1
-        if c == 300:
-            break
     print('num-samples: ', len(indices))
 
     if cfg.split_method == 'KFold':
