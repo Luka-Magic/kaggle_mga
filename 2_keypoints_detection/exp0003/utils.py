@@ -97,7 +97,7 @@ class PointCounter():
         kl_div = np.sum(np.where(p != 0, p * np.log(p / q), 0))
         return kl_div
 
-    def count(self, y_pred, thr):
+    def count(self, y_pred, thrs, wandb_thr=None):
         '''
             y_pred: torch.tensor (bs, 1, hm_h, hm_w)
         '''
@@ -110,8 +110,10 @@ class PointCounter():
         n_counts_list = []
         pre_arr = np.ones_like(y_pred) * 100
 
+        thrs = [thrs]
+
         for i in range(bs):
-            counter = 0
+            counter = {thr: 0 for thr in thrs}
             for y in range(pad, h+pad):
                 for x in range(pad, w+pad):
                     # (x, y)が中心の3*3のカーネルで、中心の値が一番大きい時のみ通過
@@ -124,9 +126,10 @@ class PointCounter():
                             pred_kernel, self.kernel)
 
                     pre_arr[i, y-2, x-2] = score
+                    for thr in thrs:
+                        if score < thr:
+                            counter[thr] += 1
 
-                    if score < thr:
-                        counter += 1
             n_counts_list.append(counter)
 
-        return np.array(n_counts_list), pre_arr
+        return n_counts_list, pre_arr
