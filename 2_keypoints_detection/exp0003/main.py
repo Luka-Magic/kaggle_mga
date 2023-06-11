@@ -460,8 +460,8 @@ def main():
         scaler = GradScaler(enabled=cfg.use_amp)
 
         for epoch in range(1, cfg.n_epochs + 1):
-            # train_loss, train_accuracy, lr = train_one_epoch(
-            #     cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
+            train_loss, train_accuracy, lr = train_one_epoch(
+                cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
             valid_loss, valid_acc_per_thr = valid_one_epoch(
                 cfg, epoch, valid_loader, model, loss_fn, device)
             print('-'*80)
