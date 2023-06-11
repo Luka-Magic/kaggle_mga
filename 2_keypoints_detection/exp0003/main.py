@@ -467,8 +467,8 @@ def main():
         point_counter = PointCounter(cfg)
 
         for epoch in range(1, cfg.n_epochs + 1):
-            # train_loss, lr = train_one_epoch(
-            #     cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, point_counter)
+            train_loss, lr = train_one_epoch(
+                cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, point_counter)
             valid_loss, valid_acc_per_thr = valid_one_epoch(
                 cfg, epoch, valid_loader, model, loss_fn, device, point_counter)
             print('-'*80)
