@@ -45,7 +45,7 @@ from pose_resnet import get_pose_net
 from loss import CenterLoss
 
 
-thresholds = np.arange(0.25, 3.25, 0.25).tolist()
+thresholds = np.arange(0.025, 0.5, 0.025).tolist()
 wandb_thr = 2.0
 
 
@@ -57,6 +57,7 @@ def split_data(cfg, lmdb_dir):
     with env.begin(write=False) as txn:
         n_samples = int(txn.get('num-samples'.encode()))
 
+    c = 0
     labels = []
     indices = []
     # check data
@@ -69,6 +70,9 @@ def split_data(cfg, lmdb_dir):
         if json_dict['chart-type'] != 'scatter':
             continue
         indices.append(idx)
+        c += 1
+        if c == 300:
+            break
     print('num-samples: ', len(indices))
 
     if cfg.split_method == 'KFold':
@@ -466,53 +470,54 @@ def main():
         point_counter = PointCounter(cfg)
 
         for epoch in range(1, cfg.n_epochs + 1):
+            wandb_dict = {
+                'epoch': epoch,
+            }
             train_loss, lr = train_one_epoch(
                 cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, point_counter)
-            valid_loss, valid_acc_per_thr = valid_one_epoch(
-                cfg, epoch, valid_loader, model, loss_fn, device, point_counter)
+            wandb_dict['lr'] = lr
+            wandb_dict['train_loss'] = train_loss
             print('-'*80)
             print(f'Epoch {epoch}/{cfg.n_epochs}')
             print(
                 # f'    Train Loss: {train_loss:.5f}, Accuracy: {train_accuracy*100:.2f}%, lr: {lr:.7f}')
                 f'    Train Loss: {train_loss:.5f}, lr: {lr:.7f}')
-            print(
-                f'    Valid Loss: {valid_loss:.5f}')
-            for thr in thresholds:
+
+            if epoch % 5 == 0:
+                valid_loss, valid_acc_per_thr = valid_one_epoch(
+                    cfg, epoch, valid_loader, model, loss_fn, device, point_counter)
                 print(
-                    f'          Valid Accuracy thr:{thr} => {valid_acc_per_thr[thr].avg*100:.1f}%')
+                    f'    Valid Loss: {valid_loss:.5f}')
+                for thr in thresholds:
+                    print(
+                        f'          Valid Accuracy thr:{thr} => {valid_acc_per_thr[thr].avg*100:.1f}%')
+                valid_accuracy = valid_acc_per_thr[wandb_thr].avg
 
+                wandb_dict['valid_loss'] = valid_loss
+                wandb_dict['valid_loss'] = valid_accuracy
+
+                # save model
+                save_dict = {
+                    'epoch': epoch,
+                    'valid_loss': valid_loss,
+                    'model': model.state_dict()
+                }
+                if valid_loss < best_score['loss']:
+                    best_score['loss'] = valid_loss
+                    torch.save(save_dict, str(SAVE_DIR / 'best_loss.pth'))
+                    if cfg.use_wandb:
+                        wandb.run.summary['best_loss'] = best_score['loss']
+                if valid_accuracy > best_score['accuracy']:
+                    best_score['accuracy'] = valid_accuracy
+                    torch.save(save_dict, str(SAVE_DIR / 'best_accuracy.pth'))
+                    if cfg.use_wandb:
+                        wandb.run.summary['best_accuracy'] = best_score['accuracy']
+                del save_dict
+                gc.collect()
             print('-'*80)
-            valid_accuracy = valid_acc_per_thr[wandb_thr].avg
-
-            # save model
-            save_dict = {
-                'epoch': epoch,
-                'valid_loss': valid_loss,
-                'model': model.state_dict()
-            }
-            if valid_loss < best_score['loss']:
-                best_score['loss'] = valid_loss
-                torch.save(save_dict, str(SAVE_DIR / 'best_loss.pth'))
-                if cfg.use_wandb:
-                    wandb.run.summary['best_loss'] = best_score['loss']
-            if valid_accuracy > best_score['accuracy']:
-                best_score['accuracy'] = valid_accuracy
-                torch.save(save_dict, str(SAVE_DIR / 'best_accuracy.pth'))
-                if cfg.use_wandb:
-                    wandb.run.summary['best_accuracy'] = best_score['accuracy']
-            del save_dict
-            gc.collect()
-
             # wandb
             if cfg.use_wandb:
-                wandb.log({
-                    'epoch': epoch,
-                    'train_loss': train_loss,
-                    # 'train_accuracy': train_accuracy,
-                    'lr': lr,
-                    'valid_loss': valid_loss,
-                    'valid_accuracy': valid_accuracy
-                })
+                wandb.log(wandb_dict)
     wandb.finish()
     del model, train_loader, valid_loader, loss_fn, optimizer, scheduler, best_loss, best_accuracy
 
