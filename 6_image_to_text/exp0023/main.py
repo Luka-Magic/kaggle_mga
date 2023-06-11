@@ -466,10 +466,10 @@ def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices, e
 
 # custom loss
 class CrossEntropyWithWeightLoss(nn.Module):
-    def __init__(self, extracted_weight=100., ignore_index=-100):
+    def __init__(self, weight_extracted=100., ignore_index=-100):
         super().__init__()
         self.log_softmax = nn.LogSoftmax(dim=1)
-        self.extracted_weight = extracted_weight
+        self.weight_extracted = weight_extracted
         if ignore_index is not None:
             self.ignore_index = ignore_index
 
@@ -484,7 +484,7 @@ class CrossEntropyWithWeightLoss(nn.Module):
         input = input.reshape(-1, vs)
         target = target.reshape(-1)
         source = torch.tile(source, (1, l)).reshape(-1)
-        weight = self.extracted_weight * source + (1. - source)
+        weight = self.weight_extracted * source + (1. - source)
 
         ls = self.log_softmax(input)
         mask = (target != self.ignore_index)
