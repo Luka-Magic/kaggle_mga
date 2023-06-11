@@ -307,12 +307,13 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         scaler.update()
         optimizer.zero_grad()
 
-        # avg_acc, cnt = calc_accuracy(
-        #     pred.detach().cpu().numpy(), heatmaps.detach().cpu().numpy())
+        avg_acc, cnt = calc_accuracy(
+            pred.detach().cpu().numpy(), heatmaps.detach().cpu().numpy())
 
-        # pred_n_points, _ = point_counter.count(pred, 3.)
-        # gt_n_points = n_points.numpy()
-        # acc = np.mean(pred_n_points == gt_n_points)
+        pred_n_points, _ = point_counter.count(pred, 3.)
+        gt_n_points = n_points.numpy()
+
+        acc = np.mean(pred_n_points == gt_n_points)
 
         # accuracy.update(acc, bs)
         losses.update(loss.item(), bs)
