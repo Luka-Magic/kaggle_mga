@@ -69,3 +69,9 @@ def is_nan(value):
         bool: True if the value is NaN, False otherwise
     """
     return isinstance(value, float) and np.isnan(value)
+
+
+def tensor2arr(tensor_img):
+    if len(tensor_img.shape) == 2:
+        tensor_img = tensor_img.unsqueeze(0)
+    return tensor_img.permute(1, 2, 0).numpy() * np.array([0.229, 0.224, 0.225]) + np.array([0.485, 0.456, 0.406])

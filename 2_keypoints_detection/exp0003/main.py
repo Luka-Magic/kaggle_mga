@@ -13,6 +13,7 @@ import lmdb
 import six
 from PIL import Image
 from torchsummary import summary
+import matplotlib.pyplot as plt
 
 # hydra
 import hydra
@@ -39,12 +40,12 @@ import albumentations
 from albumentations import KeypointParams
 from albumentations.pytorch import ToTensorV2
 
-from utils import seed_everything, AverageMeter, calc_accuracy, is_nan
+from utils import seed_everything, AverageMeter, calc_accuracy, is_nan, tensor2arr
 from pose_resnet import get_pose_net
 from loss import CenterLoss
 
 
-thresholds = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
+thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
 
 
 def split_data(cfg, lmdb_dir):
@@ -344,7 +345,8 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
 
-    for _, (images, heatmaps, n_points) in pbar:
+    idx = 1
+    for step, (images, heatmaps, n_points) in pbar:
         images = images.to(device).float()
         heatmaps = heatmaps.to(device).float()
         bs = len(images)
@@ -367,6 +369,15 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
         pbar.set_description(f'[Valid epoch {epoch}/{cfg.n_epochs}]')
         pbar.set_postfix(OrderedDict(
             loss=losses.avg, accuracy=acc_per_thr[0.5].avg))
+
+        for i in range(bs):
+            wandb.log({
+                'image': wandb.Image(tensor2arr(images[i].detach().cpu().numpy())),
+                'heatmap': wandb.Image(tensor2arr(
+                    heatmaps[i].detach().cpu().numpy())),
+                'pred_heatmap': wandb.Image(tensor2arr(torch.sigmoid(
+                    pred[i]).detach().cpu().numpy())),
+            })
 
     return losses.avg, acc_per_thr
 
