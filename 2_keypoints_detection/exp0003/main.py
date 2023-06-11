@@ -46,7 +46,7 @@ from loss import CenterLoss
 
 
 thresholds = np.arange(0.025, 0.5, 0.025).tolist()
-wandb_thr = 2.0
+wandb_thr = 0.25
 
 
 def split_data(cfg, lmdb_dir):
