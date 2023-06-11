@@ -288,7 +288,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
 
     model.train()
 
-    accuracy = AverageMeter()
+    # accuracy = AverageMeter()
     losses = AverageMeter()
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
@@ -310,21 +310,21 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         # avg_acc, cnt = calc_accuracy(
         #     pred.detach().cpu().numpy(), heatmaps.detach().cpu().numpy())
 
-        pred_n_points, _ = point_counter.count(pred, 3.)
-        gt_n_points = n_points.numpy()
-        acc = np.mean(pred_n_points == gt_n_points)
+        # pred_n_points, _ = point_counter.count(pred, 3.)
+        # gt_n_points = n_points.numpy()
+        # acc = np.mean(pred_n_points == gt_n_points)
 
-        accuracy.update(acc, bs)
+        # accuracy.update(acc, bs)
         losses.update(loss.item(), bs)
         lr = get_lr(optimizer)
         if scheduler_step_time == 'step':
             scheduler.step()
         pbar.set_description(f'[Train epoch {epoch}/{cfg.n_epochs}]')
-        pbar.set_postfix(OrderedDict(loss=losses.avg, acc=accuracy.avg))
+        # pbar.set_postfix(OrderedDict(loss=losses.avg, acc=accuracy.avg))
         if cfg.use_wandb:
             wandb.log({
                 'step': (epoch - 1) * len(pbar) + step,
-                'train_accuracy': accuracy.avg,
+                # 'train_accuracy': accuracy.avg,
                 'train_loss': losses.avg,
                 'lr': lr
             })
@@ -333,7 +333,8 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
 
     lr = get_lr(optimizer)
 
-    return losses.avg, accuracy.avg, lr
+    # return losses.avg, accuracy.avg, lr
+    return losses.avg, lr
 
 
 def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, point_counter):
@@ -459,14 +460,15 @@ def main():
         point_counter = PointCounter(cfg)
 
         for epoch in range(1, cfg.n_epochs + 1):
-            train_loss, train_accuracy, lr = train_one_epoch(
+            train_loss, lr = train_one_epoch(
                 cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, point_counter)
             valid_loss, valid_acc_per_thr = valid_one_epoch(
                 cfg, epoch, valid_loader, model, loss_fn, device, point_counter)
             print('-'*80)
             print(f'Epoch {epoch}/{cfg.n_epochs}')
             print(
-                f'    Train Loss: {train_loss:.5f}, Accuracy: {train_accuracy*100:.2f}%, lr: {lr:.7f}')
+                # f'    Train Loss: {train_loss:.5f}, Accuracy: {train_accuracy*100:.2f}%, lr: {lr:.7f}')
+                f'    Train Loss: {train_loss:.5f}, lr: {lr:.7f}')
             print(
                 f'    Valid Loss: {valid_loss:.5f}')
             for thr in thresholds:
