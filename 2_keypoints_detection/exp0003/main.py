@@ -44,6 +44,9 @@ from pose_resnet import get_pose_net
 from loss import CenterLoss
 
 
+thresholds = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
+
+
 def split_data(cfg, lmdb_dir):
     indices_dict = {}
 
@@ -307,7 +310,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         #     pred.detach().cpu().numpy(), heatmaps.detach().cpu().numpy())
 
         pred_n_points = np.sum(torch.sigmoid(
-            pred).detach().cpu().numpy() > 0.7, axis=(1, 2))
+            pred).detach().cpu().numpy() > 0.5, axis=(1, 2))
         gt_n_points = n_points.numpy()
         acc = np.mean(pred_n_points == gt_n_points)
 
@@ -336,7 +339,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
 def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
     model.eval()
 
-    accuracy = AverageMeter()
+    acc_per_thr = {thr: AverageMeter() for thr in thresholds}
     losses = AverageMeter()
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
@@ -350,18 +353,22 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
             pred = model(images)
             loss = loss_fn(pred, heatmaps)
 
-        pred_n_points = np.sum(
-            torch.sigmoid(pred).detach().cpu().numpy() > 0.7, axis=(1, 2))
         gt_n_points = n_points.numpy()
 
-        acc = np.mean(pred_n_points == gt_n_points)
-        accuracy.update(acc, bs)
+        pred_n_points_per_thr = []
+        for thr in thresholds:
+            pred_n_points_per_thr.append(np.sum(
+                torch.sigmoid(pred).detach().cpu().numpy() > thr, axis=(1, 2)))
+
+            acc = np.mean(pred_n_points_per_thr == gt_n_points)
+            acc_per_thr[thr].update(acc, bs)
         losses.update(loss.item(), bs)
 
         pbar.set_description(f'[Valid epoch {epoch}/{cfg.n_epochs}]')
-        pbar.set_postfix(OrderedDict(loss=losses.avg, accuracy=accuracy.avg))
+        pbar.set_postfix(OrderedDict(
+            loss=losses.avg, accuracy=acc_per_thr[0.5].avg))
 
-    return losses.avg, accuracy.avg
+    return losses.avg, acc_per_thr
 
 
 def main():
@@ -444,13 +451,20 @@ def main():
         for epoch in range(1, cfg.n_epochs + 1):
             train_loss, train_accuracy, lr = train_one_epoch(
                 cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
-            valid_loss, valid_accuracy = valid_one_epoch(
+            valid_loss, valid_acc_per_thr = valid_one_epoch(
                 cfg, epoch, valid_loader, model, loss_fn, device)
             print('-'*80)
             print(f'Epoch {epoch}/{cfg.n_epochs}')
-            print(f'    Train Loss: {train_loss:.5f}, lr: {lr:.7f}')
-            print(f'    Valid Loss: {valid_loss:.5f}')
+            print(
+                f'    Train Loss: {train_loss:.5f}, Accuracy: {train_accuracy*100:.2f}%, lr: {lr:.7f}')
+            print(
+                f'    Valid Loss: {valid_loss:.5f}')
+            for thr in thresholds:
+                print(
+                    f'          Valid Accuracy thr:{thr} => {valid_acc_per_thr[thr].avg*100:.1f}%')
+
             print('-'*80)
+            valid_accuracy = valid_acc_per_thr[0.5].avg
 
             # save model
             save_dict = {

@@ -52,7 +52,7 @@ img_h: 300
 img_w: 500
 
 ##### Heatmap ###########################################
-sigma: 3
+sigma: 1
 heatmap_h: 80
 heatmap_w: 128
 blur_kernel: 11
