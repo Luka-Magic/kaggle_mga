@@ -1,7 +1,7 @@
 #####   BASIC   ########################################
 use_wandb: true
 wandb_project: kaggle_mga_keypoints_detection
-dataset_name: data0002
+dataset_name: data0004
 seed: 77
 n_epochs: 10
 split_method: KFold
@@ -9,7 +9,7 @@ n_folds: 5
 use_fold: [0] # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 save_model: true
 use_amp: true
-pretrained_model_path: exp0001/best_accuracy.pth
+pretrained_model_path:
 
 ######   Label   #######################################
 chart_type2label:
