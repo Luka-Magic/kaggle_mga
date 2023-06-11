@@ -310,12 +310,8 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         #     pred.detach().cpu().numpy(), heatmaps.detach().cpu().numpy())
 
         pred_n_points = np.sum(torch.sigmoid(
-            pred).detach().cpu().numpy() > 0.5, axis=(1, 2))
+            pred.squeeze(dim=1)).detach().cpu().numpy() > 0.5, axis=(1, 2))
         gt_n_points = n_points.numpy()
-        if step < 2:
-            print(pred.shape)
-            print(pred_n_points.shape)
-            print(gt_n_points.shape)
         acc = np.mean(pred_n_points == gt_n_points)
 
         accuracy.update(acc, bs)
@@ -362,7 +358,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
         pred_n_points_per_thr = []
         for thr in thresholds:
             pred_n_points_per_thr.append(np.sum(
-                torch.sigmoid(pred).detach().cpu().numpy() > thr, axis=(1, 2)))
+                torch.sigmoid(pred.squeeze(dim=1)).detach().cpu().numpy() > thr, axis=(1, 2)))
 
             acc = np.mean(pred_n_points_per_thr == gt_n_points)
             acc_per_thr[thr].update(acc, bs)
