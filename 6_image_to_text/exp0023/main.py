@@ -548,6 +548,7 @@ def train_valid_one_epoch(
         optimizer.zero_grad(set_to_none=True)
 
         train_losses.update(loss.item(), bs)
+        torch.cuda.empty_cache()
         lr = get_lr(optimizer)
         if scheduler is not None and scheduler_step_time == 'step':
             scheduler.step()
