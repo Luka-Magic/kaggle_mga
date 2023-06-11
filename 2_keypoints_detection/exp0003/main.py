@@ -360,14 +360,14 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, point_counte
         gt_n_points = n_points.numpy()
 
         # wandb_score_maps = []
-        wandb_n_preds = []
+        # wandb_n_preds = []
         for thr in thresholds:
             pred_n_points, score_map = point_counter.count(pred, thr)
             acc = np.mean(pred_n_points == gt_n_points)
             acc_per_thr[thr].update(acc, bs)
             if thr == wandb_thr:
                 wandb_score_map = score_map.copy()
-                wandb_n_preds.append(pred_n_points.copy())
+                wandb_n_pred = pred_n_points.copy()
         losses.update(loss.item(), bs)
 
         pbar.set_description(f'[Valid epoch {epoch}/{cfg.n_epochs}]')
@@ -380,7 +380,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, point_counte
                 'heatmap': wandb.Image(heatmaps[i].detach().cpu().numpy()),
                 'pred_heatmap': wandb.Image(
                     torch.sigmoid(pred[i]).detach().cpu().numpy(),
-                    caption=f'gt: {gt_n_points[i]} / pred: {wandb_n_preds[i]} (thr={wandb_thr})'
+                    caption=f'gt: {gt_n_points[i]} / pred: {wandb_n_pred[i]} (thr={wandb_thr})'
                 ),
                 'score_map': wandb.Image(wandb_score_map[i])
             })
