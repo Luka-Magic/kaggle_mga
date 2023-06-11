@@ -56,7 +56,6 @@ def split_data(cfg, lmdb_dir):
     with env.begin(write=False) as txn:
         n_samples = int(txn.get('num-samples'.encode()))
 
-    n_samples = 5000
     labels = []
     indices = []
     # check data
@@ -372,10 +371,9 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, point_counte
         for i in range(bs):
             wandb.log({
                 'image': wandb.Image(tensor2arr(images[i].detach().cpu())),
-                'heatmap': wandb.Image(tensor2arr(
-                    heatmaps[i].detach().cpu())),
-                'pred_heatmap': wandb.Image(tensor2arr(torch.sigmoid(
-                    pred[i]).detach().cpu())),
+                'heatmap': wandb.Image(heatmaps[i].detach().cpu()),
+                'pred_heatmap': wandb.Image(torch.sigmoid(
+                    pred[i]).detach().cpu()),
                 'score_map': wandb.Image(wandb_score_map[i])
             })
 
