@@ -37,7 +37,8 @@ def ann2json(ann, id_, chart_type, img_path):
         if 'x' not in data_dict or 'y' not in data_dict:
             continue
         data_series.append(data_dict)
-    if json_dict['chart-type'] == 'scatter':
+
+    if chart_type == 'scatter':
         json_dict['data-series'] = sorted(data_series,
                                           key=itemgetter('x', 'y'))
 

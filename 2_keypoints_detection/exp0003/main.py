@@ -377,7 +377,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, point_counte
         for i in range(bs):
             wandb.log({
                 'image': wandb.Image(tensor2arr(images[i].detach().cpu())),
-                'heatmap': wandb.Image(heatmaps[i].detach().cpu()).numpy(),
+                'heatmap': wandb.Image(heatmaps[i].detach().cpu().numpy()),
                 'pred_heatmap': wandb.Image(
                     torch.sigmoid(pred[i]).detach().cpu().numpy(),
                     caption=f'gt: {gt_n_points[i]} / pred: {wandb_n_preds[i]} (thr={wandb_thr})'
