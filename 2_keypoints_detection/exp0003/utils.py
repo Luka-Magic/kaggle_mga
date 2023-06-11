@@ -4,6 +4,7 @@ import torch
 import warnings
 import cv2
 
+
 def seed_everything(seed):
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
@@ -47,7 +48,8 @@ def calc_accuracy(outputs, targets):
 
         output = output[0, :, :]
         flat_indices = np.argsort(output.ravel())
-        indices = np.column_stack(np.unravel_index(flat_indices, output.shape))[-n_points:, :] # (n_points, 2)
+        indices = np.column_stack(np.unravel_index(
+            flat_indices, output.shape))[-n_points:, :]  # (n_points, 2)
         output_set = set((x, y) for y, x in indices)
 
         n_bs_corrects += len(target_set & output_set)
@@ -56,10 +58,14 @@ def calc_accuracy(outputs, targets):
     return n_bs_corrects / n_bs_points, n_bs_points
 
 
+def is_nan(value):
+    """
+    Check if a value is NaN (not a number).
 
+    Args:
+        value (int, float, str): The value to check
 
-
-
-
-        
-
+    Returns:
+        bool: True if the value is NaN, False otherwise
+    """
+    return isinstance(value, float) and np.isnan(value)
