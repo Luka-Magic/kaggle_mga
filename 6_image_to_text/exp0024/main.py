@@ -771,6 +771,8 @@ def main():
                 start_epoch = best_score_dict[str(fold)]['epoch'] + 1
                 n_images = best_score_dict[str(fold)]['n_images']
                 best_score = best_score_dict[str(fold)]['best_score']
+                if cfg.best_score_renew:
+                    best_score = 0.0
         else:
             n_images = 0
             start_epoch = 1
