@@ -46,6 +46,7 @@ from loss import CenterLoss
 
 
 thresholds = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 10.0]
+wandb_thr = 2.0
 
 
 def split_data(cfg, lmdb_dir):
@@ -358,25 +359,30 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, point_counte
 
         gt_n_points = n_points.numpy()
 
+        wandb_score_maps = []
+        wandb_n_preds = []
         for thr in thresholds:
             pred_n_points, score_map = point_counter.count(pred, thr)
             acc = np.mean(pred_n_points == gt_n_points)
             acc_per_thr[thr].update(acc, bs)
-            if thr == 3.0:
-                wandb_score_map = score_map.copy()
+            if thr == wandb_thr:
+                wandb_score_maps.append(score_map.copy())
+                wandb_n_preds.append(pred_n_points.copy())
         losses.update(loss.item(), bs)
 
         pbar.set_description(f'[Valid epoch {epoch}/{cfg.n_epochs}]')
         pbar.set_postfix(OrderedDict(
-            loss=losses.avg, accuracy=acc_per_thr[0.5].avg))
+            loss=losses.avg, accuracy=acc_per_thr[wandb_thr].avg))
 
         for i in range(bs):
             wandb.log({
                 'image': wandb.Image(tensor2arr(images[i].detach().cpu())),
-                'heatmap': wandb.Image(heatmaps[i].detach().cpu()),
-                'pred_heatmap': wandb.Image(torch.sigmoid(
-                    pred[i]).detach().cpu()),
-                'score_map': wandb.Image(wandb_score_map[i])
+                'heatmap': wandb.Image(heatmaps[i].detach().cpu()).numpy(),
+                'pred_heatmap': wandb.Image(
+                    torch.sigmoid(pred[i]).detach().cpu().numpy(),
+                    caption=f'gt: {gt_n_points[i]} / pred: {wandb_n_preds[i]} (thr={wandb_thr})'
+                ),
+                'score_map': wandb.Image(wandb_score_maps[i])
             })
 
     return losses.avg, acc_per_thr
@@ -477,7 +483,7 @@ def main():
                     f'          Valid Accuracy thr:{thr} => {valid_acc_per_thr[thr].avg*100:.1f}%')
 
             print('-'*80)
-            valid_accuracy = valid_acc_per_thr[0.5].avg
+            valid_accuracy = valid_acc_per_thr[wandb_thr].avg
 
             # save model
             save_dict = {

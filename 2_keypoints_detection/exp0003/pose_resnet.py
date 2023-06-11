@@ -106,7 +106,7 @@ class PoseResNet(nn.Module):
             ('layer3', self._make_layer(block, 256, layers[2], stride=2)),
             ('layer4', self._make_layer(block, 512, layers[3], stride=2)),
             # used for deconv layers
-            ('deconv_layers',self._make_deconv_layer(
+            ('deconv_layers', self._make_deconv_layer(
                 3,
                 [256, 256, 256],
                 [4, 4, 4],
@@ -118,7 +118,7 @@ class PoseResNet(nn.Module):
             out_channels=output_size,
             kernel_size=1,
             stride=1,
-            padding= 0
+            padding=0
         )
 
     def _make_layer(self, block, planes, blocks, stride=1):
