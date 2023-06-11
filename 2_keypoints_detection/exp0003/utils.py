@@ -110,10 +110,12 @@ class PointCounter():
         n_counts_list = []
         pre_arr = np.ones_like(y_pred) * 100
 
-        thrs = [thrs]
+        if not isinstance(thrs, list):
+            thrs = [thrs]
 
+        n_count_dict = {thr: [] for thr in thrs}
         for i in range(bs):
-            counter = {thr: 0 for thr in thrs}
+            counter_per_data = {thr: 0 for thr in thrs}
             for y in range(pad, h+pad):
                 for x in range(pad, w+pad):
                     # (x, y)が中心の3*3のカーネルで、中心の値が一番大きい時のみ通過
@@ -128,8 +130,8 @@ class PointCounter():
                     pre_arr[i, y-2, x-2] = score
                     for thr in thrs:
                         if score < thr:
-                            counter[thr] += 1
+                            counter_per_data[thr] += 1
+            for thr in thrs:
+                n_count_dict[thr].append(counter_per_data[thr])
 
-            n_counts_list.append(counter)
-
-        return n_counts_list, pre_arr
+        return n_count_dict, pre_arr
