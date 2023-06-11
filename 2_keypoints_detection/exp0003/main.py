@@ -40,12 +40,12 @@ import albumentations
 from albumentations import KeypointParams
 from albumentations.pytorch import ToTensorV2
 
-from utils import seed_everything, AverageMeter, calc_accuracy, is_nan, tensor2arr
+from utils import seed_everything, AverageMeter, calc_accuracy, is_nan, tensor2arr, PointCounter
 from pose_resnet import get_pose_net
 from loss import CenterLoss
 
 
-thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
+thresholds = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 10.0]
 
 
 def split_data(cfg, lmdb_dir):
@@ -56,6 +56,7 @@ def split_data(cfg, lmdb_dir):
     with env.begin(write=False) as txn:
         n_samples = int(txn.get('num-samples'.encode()))
 
+    n_samples = 5000
     labels = []
     indices = []
     # check data
@@ -281,7 +282,7 @@ def prepare_dataloader(cfg, lmdb_dir, train_indices, valid_indices):
     return train_loader, valid_loader, valid_tta_loader
 
 
-def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, scheduler, scheduler_step_time, scaler):
+def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, scheduler, scheduler_step_time, scaler, point_counter):
     def get_lr(optimizer):
         for param_group in optimizer.param_groups:
             return param_group['lr']
@@ -310,8 +311,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         # avg_acc, cnt = calc_accuracy(
         #     pred.detach().cpu().numpy(), heatmaps.detach().cpu().numpy())
 
-        pred_n_points = np.sum(torch.sigmoid(
-            pred.squeeze(dim=1)).detach().cpu().numpy() > 0.5, axis=(1, 2))
+        pred_n_points, _ = point_counter.count(pred, 3.)
         gt_n_points = n_points.numpy()
         acc = np.mean(pred_n_points == gt_n_points)
 
@@ -337,7 +337,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
     return losses.avg, accuracy.avg, lr
 
 
-def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
+def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, point_counter):
     model.eval()
 
     acc_per_thr = {thr: AverageMeter() for thr in thresholds}
@@ -357,13 +357,12 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
 
         gt_n_points = n_points.numpy()
 
-        pred_n_points_per_thr = []
         for thr in thresholds:
-            pred_n_points_per_thr.append(np.sum(
-                torch.sigmoid(pred.squeeze(dim=1)).detach().cpu().numpy() > thr, axis=(1, 2)))
-
-            acc = np.mean(pred_n_points_per_thr == gt_n_points)
+            pred_n_points, score_map = point_counter.count(pred, thr)
+            acc = np.mean(pred_n_points == gt_n_points)
             acc_per_thr[thr].update(acc, bs)
+            if thr == 3.0:
+                wandb_score_map = score_map.copy()
         losses.update(loss.item(), bs)
 
         pbar.set_description(f'[Valid epoch {epoch}/{cfg.n_epochs}]')
@@ -377,6 +376,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
                     heatmaps[i].detach().cpu())),
                 'pred_heatmap': wandb.Image(tensor2arr(torch.sigmoid(
                     pred[i]).detach().cpu())),
+                'score_map': wandb.Image(wandb_score_map[i])
             })
 
     return losses.avg, acc_per_thr
@@ -458,12 +458,13 @@ def main():
 
         # grad scaler
         scaler = GradScaler(enabled=cfg.use_amp)
+        point_counter = PointCounter(cfg)
 
         for epoch in range(1, cfg.n_epochs + 1):
             train_loss, train_accuracy, lr = train_one_epoch(
-                cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler)
+                cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, point_counter)
             valid_loss, valid_acc_per_thr = valid_one_epoch(
-                cfg, epoch, valid_loader, model, loss_fn, device)
+                cfg, epoch, valid_loader, model, loss_fn, device, point_counter)
             print('-'*80)
             print(f'Epoch {epoch}/{cfg.n_epochs}')
             print(

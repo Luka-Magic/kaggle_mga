@@ -75,3 +75,55 @@ def tensor2arr(tensor_img):
     if len(tensor_img.shape) == 2:
         tensor_img = tensor_img.unsqueeze(0)
     return tensor_img.permute(1, 2, 0).numpy() * np.array([0.229, 0.224, 0.225]) + np.array([0.485, 0.456, 0.406])
+
+
+class PointCounter():
+    def __init__(self, cfg):
+        k_s = 5
+        kernel = np.zeros((k_s, k_s))
+        c = k_s // 2
+        for x in range(k_s):
+            for y in range(k_s):
+                kernel[x][y] = np.exp(- ((x - c) ** 2 +
+                                      (y - c) ** 2) / (2 * cfg.sigma ** 2))
+        self.kernel = kernel
+        self.kernel_size = k_s
+
+    def _calc_kl_divergence(self, pred_kernel, gt_kernel):
+        p = np.clip(pred_kernel.flatten(), 1e-7, 1.0)
+        p /= np.sum(p)
+        q = np.clip(gt_kernel.flatten(), 1e-7, 1.0)
+        q /= np.sum(q)
+        kl_div = np.sum(np.where(p != 0, p * np.log(p / q), 0))
+        return kl_div
+
+    def count(self, y_pred, thr):
+        '''
+            y_pred: torch.tensor (bs, 1, hm_h, hm_w)
+        '''
+        bs, _, h, w = y_pred.shape
+        y_pred = torch.sigmoid(y_pred).squeeze(1).detach().cpu().numpy()
+        pad = self.kernel_size // 2
+        y_pred_pad = np.pad(y_pred, ((0, 0), (pad, pad), (pad, pad)))
+
+        n_counts_list = []
+        pre_arr = np.zeros_like(y_pred)
+        for i in range(bs):
+            counter = 0
+            for y in range(pad, h+pad*2):
+                for x in range(pad, w+pad*2):
+                    # (x, y)が中心の3*3のカーネルで、中心の値が一番大きい時のみ通過
+                    if not np.argmax(y_pred_pad[i][y-1:y+1][x-1:x+1]) == 4:
+                        score = 0.0
+                    else:
+                        pred_kernel = y_pred_pad[i][y-pad:y+pad][x-pad:x+pad]
+                        score = self._calc_kl_divergence(
+                            pred_kernel, self.kernel)
+
+                    pre_arr[i, x-2, y-2] = score
+
+                    if score < thr:
+                        counter += 1
+            n_counts_list.append(counter)
+
+        return np.array(n_counts_list), pre_arr
