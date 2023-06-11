@@ -359,14 +359,14 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, point_counte
 
         gt_n_points = n_points.numpy()
 
-        wandb_score_maps = []
+        # wandb_score_maps = []
         wandb_n_preds = []
         for thr in thresholds:
             pred_n_points, score_map = point_counter.count(pred, thr)
             acc = np.mean(pred_n_points == gt_n_points)
             acc_per_thr[thr].update(acc, bs)
             if thr == wandb_thr:
-                wandb_score_maps.append(score_map.copy())
+                wandb_score_map = score_map.copy()
                 wandb_n_preds.append(pred_n_points.copy())
         losses.update(loss.item(), bs)
 
@@ -382,7 +382,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, point_counte
                     torch.sigmoid(pred[i]).detach().cpu().numpy(),
                     caption=f'gt: {gt_n_points[i]} / pred: {wandb_n_preds[i]} (thr={wandb_thr})'
                 ),
-                'score_map': wandb.Image(wandb_score_maps[i])
+                'score_map': wandb.Image(wandb_score_map[i])
             })
 
     return losses.avg, acc_per_thr
@@ -467,8 +467,8 @@ def main():
         point_counter = PointCounter(cfg)
 
         for epoch in range(1, cfg.n_epochs + 1):
-            train_loss, lr = train_one_epoch(
-                cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, point_counter)
+            # train_loss, lr = train_one_epoch(
+            #     cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, point_counter)
             valid_loss, valid_acc_per_thr = valid_one_epoch(
                 cfg, epoch, valid_loader, model, loss_fn, device, point_counter)
             print('-'*80)

@@ -41,7 +41,8 @@ def ann2json(ann, id_, chart_type, img_path):
     if chart_type == 'scatter':
         json_dict['data-series'] = sorted(data_series,
                                           key=itemgetter('x', 'y'))
-
+    else:
+        json_dict['data-series'] = data_series
     json_dict['chart-type'] = chart_type
     json_dict['count'] = len(ann['task6']['output']['data series'][0]['data'])
     json_dict['source'] = 'icdar2022'
