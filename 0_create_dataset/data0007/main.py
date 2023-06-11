@@ -37,8 +37,9 @@ def ann2json(ann, id_, chart_type, img_path):
         if 'x' not in data_dict or 'y' not in data_dict:
             continue
         data_series.append(data_dict)
-
-    json_dict['data-series'] = sorted(data_series, key=itemgetter('x', 'y'))
+    if json_dict['chart-type'] == 'scatter':
+        json_dict['data-series'] = sorted(data_series,
+                                          key=itemgetter('x', 'y'))
 
     json_dict['chart-type'] = chart_type
     json_dict['count'] = len(ann['task6']['output']['data series'][0]['data'])
