@@ -108,19 +108,21 @@ class PointCounter():
 
         n_counts_list = []
         pre_arr = np.zeros_like(y_pred)
+
         for i in range(bs):
             counter = 0
-            for y in range(pad, h+pad*2):
-                for x in range(pad, w+pad*2):
+            for y in range(pad, h+pad):
+                for x in range(pad, w+pad):
                     # (x, y)が中心の3*3のカーネルで、中心の値が一番大きい時のみ通過
-                    if not np.argmax(y_pred_pad[i][y-1:y+1][x-1:x+1]) == 4:
+                    if not np.argmax(y_pred_pad[i, y-1:y+2, x-1:x+2]) == 4:
                         score = 0.0
                     else:
-                        pred_kernel = y_pred_pad[i][y-pad:y+pad][x-pad:x+pad]
+                        pred_kernel = y_pred_pad[i,
+                                                 y-pad:y+pad+1, x-pad:x+pad+1]
                         score = self._calc_kl_divergence(
                             pred_kernel, self.kernel)
 
-                    pre_arr[i, x-2, y-2] = score
+                    pre_arr[i, y-2, x-2] = score
 
                     if score < thr:
                         counter += 1
