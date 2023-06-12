@@ -471,6 +471,9 @@ def main():
             }
             train_loss, lr = train_one_epoch(
                 cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, point_counter)
+            valid_loss, valid_acc_per_thr = valid_one_epoch(
+                cfg, epoch, valid_loader, model, loss_fn, device, point_counter)
+
             wandb_dict['lr'] = lr
             wandb_dict['train_loss'] = train_loss
             print('-'*80)
@@ -478,38 +481,34 @@ def main():
             print(
                 # f'    Train Loss: {train_loss:.5f}, Accuracy: {train_accuracy*100:.2f}%, lr: {lr:.7f}')
                 f'    Train Loss: {train_loss:.5f}, lr: {lr:.7f}')
-
-            if epoch % 5 == 0:
-                valid_loss, valid_acc_per_thr = valid_one_epoch(
-                    cfg, epoch, valid_loader, model, loss_fn, device, point_counter)
+            print(
+                f'    Valid Loss: {valid_loss:.5f}')
+            for thr in thresholds:
                 print(
-                    f'    Valid Loss: {valid_loss:.5f}')
-                for thr in thresholds:
-                    print(
-                        f'          Valid Accuracy thr:{thr} => {valid_acc_per_thr[thr].avg*100:.1f}%')
-                valid_accuracy = valid_acc_per_thr[wandb_thr].avg
+                    f'          Valid Accuracy thr:{thr} => {valid_acc_per_thr[thr].avg*100:.1f}%')
+            valid_accuracy = valid_acc_per_thr[wandb_thr].avg
 
-                wandb_dict['valid_loss'] = valid_loss
-                wandb_dict['valid_loss'] = valid_accuracy
+            wandb_dict['valid_loss'] = valid_loss
+            wandb_dict['valid_loss'] = valid_accuracy
 
-                # save model
-                save_dict = {
-                    'epoch': epoch,
-                    'valid_loss': valid_loss,
-                    'model': model.state_dict()
-                }
-                if valid_loss < best_score['loss']:
-                    best_score['loss'] = valid_loss
-                    torch.save(save_dict, str(SAVE_DIR / 'best_loss.pth'))
-                    if cfg.use_wandb:
-                        wandb.run.summary['best_loss'] = best_score['loss']
-                if valid_accuracy > best_score['accuracy']:
-                    best_score['accuracy'] = valid_accuracy
-                    torch.save(save_dict, str(SAVE_DIR / 'best_accuracy.pth'))
-                    if cfg.use_wandb:
-                        wandb.run.summary['best_accuracy'] = best_score['accuracy']
-                del save_dict
-                gc.collect()
+            # save model
+            save_dict = {
+                'epoch': epoch,
+                'valid_loss': valid_loss,
+                'model': model.state_dict()
+            }
+            if valid_loss < best_score['loss']:
+                best_score['loss'] = valid_loss
+                torch.save(save_dict, str(SAVE_DIR / 'best_loss.pth'))
+                if cfg.use_wandb:
+                    wandb.run.summary['best_loss'] = best_score['loss']
+            if valid_accuracy > best_score['accuracy']:
+                best_score['accuracy'] = valid_accuracy
+                torch.save(save_dict, str(SAVE_DIR / 'best_accuracy.pth'))
+                if cfg.use_wandb:
+                    wandb.run.summary['best_accuracy'] = best_score['accuracy']
+            del save_dict
+            gc.collect()
             print('-'*80)
             # wandb
             if cfg.use_wandb:
