@@ -45,7 +45,8 @@ from pose_resnet import get_pose_net
 from loss import CenterLoss
 
 
-thresholds = np.round(np.arange(0.025, 0.525, 0.025), 4).tolist()
+# thresholds = np.round(np.arange(0.025, 0.525, 0.025), 4).tolist()
+thresholds = [0.2, 0.25, 0.3]
 wandb_thr = 0.25
 
 
@@ -429,7 +430,7 @@ def main():
             model = get_pose_net(cfg.output_size).to(device)
         else:
             NotImplementedError
-        print(summary(model, (3, 300, 500)))
+        print(summary(model, (cfg.input_size, cfg.img_h, cfg.img_w)))
 
         if cfg.pretrained_model_path is not None:
             model.backbone.load_state_dict(torch.load(
@@ -476,7 +477,7 @@ def main():
 
             wandb_dict['lr'] = lr
             wandb_dict['train_loss'] = train_loss
-            print('-'*80)
+            print('-'*8)
             print(f'Epoch {epoch}/{cfg.n_epochs}')
             print(
                 # f'    Train Loss: {train_loss:.5f}, Accuracy: {train_accuracy*100:.2f}%, lr: {lr:.7f}')
