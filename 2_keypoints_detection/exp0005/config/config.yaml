@@ -5,6 +5,7 @@ wandb_project: kaggle_mga_keypoints_detection
 dataset_name: data0004
 extra_train_datasets: []
 extra_valid_datasets: [data0006, data0007]
+chart_types: [scatter]
 seed: 77
 n_epochs: 20
 split_method: StratifiedKFold

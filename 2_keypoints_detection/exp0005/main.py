@@ -47,7 +47,7 @@ from loss import CenterLoss
 
 
 thresholds = np.round(np.arange(0.1, 1.0, 0.1), 4).tolist()
-wandb_thr = 0.5
+wandb_thr = 0.3
 
 CHART_TYPE2LABEL = {
     'line': 0,
