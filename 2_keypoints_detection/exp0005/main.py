@@ -325,7 +325,7 @@ class MgaLmdbDataset(Dataset):
             transformed = self.transforms(image=img)
             img = transformed['image']
             img = torch.from_numpy(img).permute(2, 0, 1)
-            img, n_points
+            return img, n_points
 
 
 def get_transforms(cfg, phase):
