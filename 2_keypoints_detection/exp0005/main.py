@@ -478,15 +478,16 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, point_counte
         pbar.set_description(f'[Valid epoch {epoch}/{cfg.n_epochs}]')
         pbar.set_postfix(OrderedDict(accuracy=acc_per_thr[wandb_thr].avg))
 
-        for i in range(bs):
-            wandb.log({
-                'image': wandb.Image(tensor2arr(images[i].detach().cpu())),
-                'pred_heatmap': wandb.Image(
-                    torch.sigmoid(pred[i]).detach().cpu().numpy(),
-                    caption=f'gt: {gt_n_points[i]} / pred: {wandb_n_pred[i]} (thr={wandb_thr})'
-                ),
-                'score_map': wandb.Image(score_map[i])
-            })
+        if cfg.use_wandb:
+            for i in range(bs):
+                wandb.log({
+                    'image': wandb.Image(tensor2arr(images[i].detach().cpu())),
+                    'pred_heatmap': wandb.Image(
+                        torch.sigmoid(pred[i]).detach().cpu().numpy(),
+                        caption=f'gt: {gt_n_points[i]} / pred: {wandb_n_pred[i]} (thr={wandb_thr})'
+                    ),
+                    'score_map': wandb.Image(score_map[i])
+                })
 
     return acc_per_thr
 
@@ -528,7 +529,7 @@ def main():
                        name=f'{exp_name}', config=wandb.config)
             wandb.config.fold = fold
 
-        train_loader, valid_loader, _ = prepare_dataloader(
+        train_loader, valid_loader, extra_valid_dict = prepare_dataloader(
             cfg, LMDB_DIR, indices_dict[fold]['train'], indices_dict[fold]['valid'], extra_train_info, extra_valid_info)
 
         best_score = {
@@ -597,6 +598,13 @@ def main():
                 print(
                     f'    Valid Accuracy thr:{thr} => {valid_acc_per_thr[thr].avg*100:.1f}%')
             valid_accuracy = valid_acc_per_thr[wandb_thr].avg
+            for dataset_name, extra_valid in extra_valid_dict.items():
+                extra_valid_acc_per_thr = valid_one_epoch(
+                    cfg, epoch, extra_valid['valid_loader'], model, loss_fn, device, point_counter)
+                print(f'    EXTRA VALID - {dataset_name}:')
+                for thr in thresholds:
+                    print(
+                        f'    Valid Accuracy thr:{thr} => {extra_valid_acc_per_thr[thr].avg*100:.1f}%')
 
             wandb_dict['valid_accuracy'] = valid_accuracy
 
