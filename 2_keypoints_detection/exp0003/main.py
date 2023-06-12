@@ -45,8 +45,8 @@ from pose_resnet import get_pose_net
 from loss import CenterLoss
 
 
-# thresholds = np.round(np.arange(0.025, 0.525, 0.025), 4).tolist()
-thresholds = [0.2, 0.25, 0.3]
+thresholds = np.round(np.arange(0.025, 0.525, 0.025), 4).tolist()
+# thresholds = [0.2, 0.25, 0.3]
 wandb_thr = 0.25
 
 

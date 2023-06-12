@@ -31,7 +31,7 @@ gamma: 0. # FOCALLoss
 
 ##### Optimizer ########################################
 optimizer: AdamW
-lr: 1e-4
+lr: 5e-4
 weight_decay: 1e-6
 
 ##### Scheduler ########################################
@@ -58,8 +58,8 @@ heatmap_w: 192
 blur_kernel: 11
 
 ##### DataLoader ########################################
-train_bs: 32
-valid_bs: 32
+train_bs: 16
+valid_bs: 16
 num_workers: 2
 
 ##### Data Augmentation #################################
