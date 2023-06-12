@@ -293,7 +293,6 @@ class MgaLmdbDataset(Dataset):
         # label
         json_dict = json.loads(label)
         n_points = self._count_n_points(json_dict)
-        img = torch.from_numpy(img).permute(2, 0, 1)
         if self.output_hm:
             chart_type = json_dict['chart-type']
             point_name = self.chart2point_name[chart_type]
@@ -307,6 +306,7 @@ class MgaLmdbDataset(Dataset):
 
             transformed = self.transforms(image=img, keypoints=keypoints)
             img = transformed['image']
+            img = torch.from_numpy(img).permute(2, 0, 1)
             keypoints = transformed['keypoints']
 
             if len(keypoints) != 0:
@@ -322,6 +322,9 @@ class MgaLmdbDataset(Dataset):
 
             return img, heatmap, n_points
         else:
+            transformed = self.transforms(image=img)
+            img = transformed['image']
+            img = torch.from_numpy(img).permute(2, 0, 1)
             img, n_points
 
 
@@ -336,7 +339,10 @@ def get_transforms(cfg, phase):
     augs = [getattr(albumentations, name)(**kwargs)
             for name, kwargs in aug.items()]
     # augs.append(ToTensorV2(p=1.))
-    return albumentations.Compose(augs, keypoint_params=KeypointParams(format='xy'))
+    if phase == 'train':
+        return albumentations.Compose(augs, keypoint_params=KeypointParams(format='xy'))
+    else:
+        return albumentations.Compose(augs)
 
 
 def prepare_dataloader(cfg, lmdb_dir, train_indices, valid_indices, extra_train_info, extra_valid_info):
