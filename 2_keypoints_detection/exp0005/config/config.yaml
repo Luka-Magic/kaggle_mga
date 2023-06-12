@@ -1,0 +1,107 @@
+#####   BASIC   ########################################
+debug: true
+use_wandb: false
+wandb_project: kaggle_mga_keypoints_detection
+dataset_name: data0004
+extra_train_datasets: []
+extra_valid_datasets: [data0006, data0007]
+seed: 77
+n_epochs: 20
+split_method: StratifiedKFold
+n_folds: 5
+use_fold: [0] # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+save_model: true
+use_amp: true
+pretrained_model_path:
+
+######   Label   #######################################
+chart_type2label:
+  line: 0
+  vertical_bar: 1
+  scatter: 2
+  dot: 3
+  horizontal_bar: 4
+
+######   Model   #######################################
+model_arch: hourglassnet
+pretrained: false
+input_size: 3
+output_size: 1
+
+######   Loss   ########################################
+loss_fn: CenterLoss
+gamma: 0. # FOCALLoss
+
+##### Optimizer ########################################
+optimizer: AdamW
+lr: 5e-4
+weight_decay: 1e-6
+
+##### Scheduler ########################################
+scheduler: OneCycleLR # OneCycleLR
+scheduler_step_time: step
+T_0: ${n_epochs} # CAWR
+T_mult: 1 # CAWR
+eta_min: 1e-9 # CAWR
+
+pct_start: 0.1 # OCLR
+div_factor: 100. # OCLR
+final_div_factor: 1000. # OCLR
+
+##### Image Info ########################################
+img_mean: [0.8578, 0.8552, 0.8507]
+img_std: [0.2747, 0.2747, 0.2809]
+img_h: 512
+img_w: 768
+
+##### Heatmap ###########################################
+sigma: 1
+heatmap_h: 128
+heatmap_w: 192
+blur_kernel: 11
+
+##### DataLoader ########################################
+train_bs: 16
+valid_bs: 16
+num_workers: 2
+
+##### Data Augmentation #################################
+train_aug:
+  Resize:
+    height: ${img_h}
+    width: ${img_w}
+    p: 1.0
+  Normalize:
+    mean: ${img_mean}
+    std: ${img_std}
+    max_pixel_value: 255.0
+    p: 1.0
+
+valid_aug:
+  Resize:
+    height: ${img_h}
+    width: ${img_w}
+  Normalize:
+    mean: ${img_mean}
+    std: ${img_std}
+    max_pixel_value: 255.0
+    p: 1.0
+
+tta_aug:
+  Normalize:
+    mean: ${img_mean}
+    std: ${img_std}
+    max_pixel_value: 255.0
+    p: 1.0
+  Resize:
+    height: ${img_h}
+    width: ${img_w}
+  RandomResizedCrop:
+    height: ${img_h}
+    width: ${img_w}
+    scale: [0.3, 1.0]
+    p: 1.0
+  HorizontalFlip:
+    p: 0.5
+  VerticalFlip:
+    p: 0.5
