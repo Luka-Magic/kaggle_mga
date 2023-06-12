@@ -382,7 +382,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, point_counte
                     torch.sigmoid(pred[i]).detach().cpu().numpy(),
                     caption=f'gt: {gt_n_points[i]} / pred: {wandb_n_pred[i]} (thr={wandb_thr})'
                 ),
-                'score_map': wandb.Image(score_map[i])
+                # 'score_map': wandb.Image(score_map[i])
             })
 
     return losses.avg, acc_per_thr
