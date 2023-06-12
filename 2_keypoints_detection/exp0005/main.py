@@ -31,7 +31,7 @@ from sklearn.model_selection import KFold, StratifiedKFold
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, ConcatDataset
 from torch import optim
 from torchvision.transforms import Compose
 from torch.cuda.amp import autocast, GradScaler
@@ -292,40 +292,37 @@ class MgaLmdbDataset(Dataset):
 
         # label
         json_dict = json.loads(label)
-        chart_type = json_dict['chart-type']
-        point_name = self.chart2point_name[chart_type]
-
-        keypoints = []
-        for dic in json_dict['visual-elements'][point_name][0]:
-            x, y = dic['x'], dic['y']
-            if x < 0 or y < 0 or x > w or y > h:
-                continue
-            keypoints.append([x, y])
-
-        # kp_arr = np.array(keypoints)
-        # kp_min = np.amin(kp_arr, 0)
-        # if kp_min[0] < 0 or kp_min[1] < 0:
-        #     # print(keypoints)
-        #     print(json_dict['id'])
-
-        transformed = self.transforms(image=img, keypoints=keypoints)
-        img = transformed['image']
-        keypoints = transformed['keypoints']
-
-        if len(keypoints) != 0:
-            keypoints_on_hm = np.array(keypoints) * \
-                np.array([self.heatmap_w, self.heatmap_h]) / \
-                np.array([self.img_w, self.img_h])
-
-            heatmap = self._create_heatmap(keypoints_on_hm)
-        else:
-            heatmap = np.zeros((self.heatmap_h, self.heatmap_w))
-        img = torch.from_numpy(img).permute(2, 0, 1)
-        heatmap = torch.from_numpy(heatmap)
-
         n_points = self._count_n_points(json_dict)
+        img = torch.from_numpy(img).permute(2, 0, 1)
+        if self.output_hm:
+            chart_type = json_dict['chart-type']
+            point_name = self.chart2point_name[chart_type]
 
-        return img, heatmap, n_points
+            keypoints = []
+            for dic in json_dict['visual-elements'][point_name][0]:
+                x, y = dic['x'], dic['y']
+                if x < 0 or y < 0 or x > w or y > h:
+                    continue
+                keypoints.append([x, y])
+
+            transformed = self.transforms(image=img, keypoints=keypoints)
+            img = transformed['image']
+            keypoints = transformed['keypoints']
+
+            if len(keypoints) != 0:
+                keypoints_on_hm = np.array(keypoints) * \
+                    np.array([self.heatmap_w, self.heatmap_h]) / \
+                    np.array([self.img_w, self.img_h])
+
+                heatmap = self._create_heatmap(keypoints_on_hm)
+            else:
+                heatmap = np.zeros((self.heatmap_h, self.heatmap_w))
+
+            heatmap = torch.from_numpy(heatmap)
+
+            return img, heatmap, n_points
+        else:
+            img, n_points
 
 
 def get_transforms(cfg, phase):
@@ -342,22 +339,26 @@ def get_transforms(cfg, phase):
     return albumentations.Compose(augs, keypoint_params=KeypointParams(format='xy'))
 
 
-def prepare_dataloader(cfg, lmdb_dir, train_indices, valid_indices):
-    train_ds = MgaLmdbDataset(cfg, lmdb_dir, train_indices,
-                              transforms=get_transforms(cfg, 'train'))
-    valid_ds = MgaLmdbDataset(cfg, lmdb_dir, valid_indices,
-                              transforms=get_transforms(cfg, 'valid'))
-    valid_tta_ds = MgaLmdbDataset(
-        cfg, lmdb_dir, valid_indices, transforms=get_transforms(cfg, 'tta'))
-
+def prepare_dataloader(cfg, lmdb_dir, train_indices, valid_indices, extra_train_info, extra_valid_info):
+    train_ds_list = []
+    train_ds_list.append(MgaLmdbDataset(cfg, lmdb_dir, train_indices,
+                                        transforms=get_transforms(cfg, 'train'), output_hm=True))
+    for dataset_info in extra_train_info.values():
+        extra_lmdb_dir = dataset_info['lmdb_dir']
+        extra_train_indices = dataset_info['train']
+        train_ds_list.append(MgaLmdbDataset(cfg, extra_lmdb_dir, extra_train_indices,
+                                            transforms=get_transforms(cfg, 'train'), output_hm=True))
+    concat_train_ds = ConcatDataset(train_ds_list)
     train_loader = DataLoader(
-        train_ds,
+        concat_train_ds,
         batch_size=cfg.train_bs,
         shuffle=True,
         num_workers=cfg.num_workers,
         pin_memory=True
     )
 
+    valid_ds = MgaLmdbDataset(cfg, lmdb_dir, valid_indices,
+                              transforms=get_transforms(cfg, 'valid'), output_hm=False)
     valid_loader = DataLoader(
         valid_ds,
         batch_size=cfg.valid_bs,
@@ -366,14 +367,24 @@ def prepare_dataloader(cfg, lmdb_dir, train_indices, valid_indices):
         pin_memory=True
     )
 
-    valid_tta_loader = DataLoader(
-        valid_tta_ds,
-        batch_size=cfg.valid_bs,
-        shuffle=False,
-        num_workers=cfg.num_workers,
-        pin_memory=True
-    )
-    return train_loader, valid_loader, valid_tta_loader
+    extra_valid_dict = {}
+    for dataset_name, dataset_info in extra_valid_info.items():
+        extra_lmdb_dir = dataset_info['lmdb_dir']
+        extra_valid_indices = dataset_info['valid']
+        extra_valid_ds = MgaLmdbDataset(
+            cfg, extra_lmdb_dir, extra_valid_indices, transforms=get_transforms(cfg, 'valid'), output_hm=False)
+        extra_valid_loader = DataLoader(
+            extra_valid_ds,
+            batch_size=cfg.valid_bs,
+            shuffle=False,
+            num_workers=cfg.num_workers,
+            pin_memory=True
+        )
+        extra_valid_dict[dataset_name] = {
+            'valid_loader':  extra_valid_loader
+        }
+
+    return train_loader, valid_loader, extra_valid_dict
 
 
 def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, scheduler, scheduler_step_time, scaler, point_counter):
@@ -482,6 +493,12 @@ def main():
     ROOT_DIR = Path.cwd().parents[2]
     exp_name = EXP_PATH.name
     LMDB_DIR = ROOT_DIR / 'data' / cfg.dataset_name / 'lmdb'
+    EXTRA_TRAIN_DIRS = []
+    EXTRA_VALID_DIRS = []
+    for extra_train_dir in cfg.extra_train_datasets:
+        EXTRA_TRAIN_DIRS.append(ROOT_DIR / 'data' / extra_train_dir)
+    for extra_valid_dir in cfg.extra_valid_datasets:
+        EXTRA_VALID_DIRS.append(ROOT_DIR / 'data' / extra_valid_dir)
     SAVE_DIR = ROOT_DIR / 'outputs' / '2_keypoints_detection' / exp_name
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -493,6 +510,8 @@ def main():
         wandb.login()
 
     indices_dict = split_data(cfg, LMDB_DIR)
+    extra_train_info, extra_valid_info = split_extra_data(
+        cfg, EXTRA_TRAIN_DIRS, EXTRA_VALID_DIRS)
 
     for fold in cfg.use_fold:
 
@@ -504,7 +523,7 @@ def main():
             wandb.config.fold = fold
 
         train_loader, valid_loader, _ = prepare_dataloader(
-            cfg, LMDB_DIR, indices_dict[fold]['train'], indices_dict[fold]['valid'])
+            cfg, LMDB_DIR, indices_dict[fold]['train'], indices_dict[fold]['valid'], extra_train_info, extra_valid_info)
 
         best_score = {
             'loss': float('inf'),
