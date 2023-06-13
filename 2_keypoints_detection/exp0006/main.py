@@ -410,6 +410,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
     for step, (images, heatmaps, n_points, source) in pbar:
         images = images.to(device).float()
         heatmaps = heatmaps.to(device).float()
+        source = source.to(device).long()
         bs = len(images)
 
         with autocast(enabled=cfg.use_amp):
