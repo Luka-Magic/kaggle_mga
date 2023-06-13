@@ -88,5 +88,5 @@ class CenterSourceWeightLoss(nn.Module):
         pred = torch.sigmoid(pred[:, 0])
         weight = self.weight_extracted * source + (1. - source)
         weight = weight.view(-1, 1, 1)
-        loss = neg_loss(pred, gt, weight)
+        loss = neg_source_weight_loss(pred, gt, weight)
         return loss
