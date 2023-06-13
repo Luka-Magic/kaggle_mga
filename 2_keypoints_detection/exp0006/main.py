@@ -43,7 +43,7 @@ from albumentations.pytorch import ToTensorV2
 
 from utils import seed_everything, AverageMeter, calc_accuracy, is_nan, tensor2arr, PointCounter
 from pose_resnet import get_pose_net
-from loss import CenterLoss
+from loss import CenterLoss, CenterSourceWeightLoss
 
 
 thresholds = np.round(np.arange(0.1, 1.0, 0.1), 4).tolist()
@@ -193,7 +193,7 @@ def split_extra_data(cfg, extra_train_dirs, extra_valid_dirs):
 
 # Lmdb Dataset
 class MgaLmdbDataset(Dataset):
-    def __init__(self, cfg, lmdb_dir, indices, transforms, output_hm=True):
+    def __init__(self, cfg, lmdb_dir, indices, transforms, phase='train'):
         super().__init__()
         self.cfg = cfg
         self.transforms = transforms
@@ -204,7 +204,7 @@ class MgaLmdbDataset(Dataset):
         self.sigma = cfg.sigma
         self.img_h, self.img_w = cfg.img_h, cfg.img_w
         self.heatmap_h, self.heatmap_w = cfg.heatmap_h, cfg.heatmap_w
-        self.output_hm = output_hm
+        self.phase = phase
         self.chart2point_name = {
             'scatter': 'scatter points',
             'line': 'lines',
@@ -293,7 +293,9 @@ class MgaLmdbDataset(Dataset):
         # label
         json_dict = json.loads(label)
         n_points = self._count_n_points(json_dict)
-        if self.output_hm:
+        source = 1 if json_dict['source'] == 'extracted' else 0
+
+        if self.phase == 'train':
             chart_type = json_dict['chart-type']
             point_name = self.chart2point_name[chart_type]
 
@@ -320,7 +322,7 @@ class MgaLmdbDataset(Dataset):
 
             heatmap = torch.from_numpy(heatmap)
 
-            return img, heatmap, n_points
+            return img, heatmap, n_points, source
         else:
             transformed = self.transforms(image=img)
             img = transformed['image']
@@ -348,12 +350,12 @@ def get_transforms(cfg, phase):
 def prepare_dataloader(cfg, lmdb_dir, train_indices, valid_indices, extra_train_info, extra_valid_info):
     train_ds_list = []
     train_ds_list.append(MgaLmdbDataset(cfg, lmdb_dir, train_indices,
-                                        transforms=get_transforms(cfg, 'train'), output_hm=True))
+                                        transforms=get_transforms(cfg, 'train'), phase='train'))
     for dataset_info in extra_train_info.values():
         extra_lmdb_dir = dataset_info['lmdb_dir']
         extra_train_indices = dataset_info['train']
         train_ds_list.append(MgaLmdbDataset(cfg, extra_lmdb_dir, extra_train_indices,
-                                            transforms=get_transforms(cfg, 'train'), output_hm=True))
+                                            transforms=get_transforms(cfg, 'train'), phase='train'))
     concat_train_ds = ConcatDataset(train_ds_list)
     train_loader = DataLoader(
         concat_train_ds,
@@ -364,7 +366,7 @@ def prepare_dataloader(cfg, lmdb_dir, train_indices, valid_indices, extra_train_
     )
 
     valid_ds = MgaLmdbDataset(cfg, lmdb_dir, valid_indices,
-                              transforms=get_transforms(cfg, 'valid'), output_hm=False)
+                              transforms=get_transforms(cfg, 'valid'), phase='valid')
     valid_loader = DataLoader(
         valid_ds,
         batch_size=cfg.valid_bs,
@@ -378,7 +380,7 @@ def prepare_dataloader(cfg, lmdb_dir, train_indices, valid_indices, extra_train_
         extra_lmdb_dir = dataset_info['lmdb_dir']
         extra_valid_indices = dataset_info['valid']
         extra_valid_ds = MgaLmdbDataset(
-            cfg, extra_lmdb_dir, extra_valid_indices, transforms=get_transforms(cfg, 'valid'), output_hm=False)
+            cfg, extra_lmdb_dir, extra_valid_indices, transforms=get_transforms(cfg, 'valid'), phase='valid')
         extra_valid_loader = DataLoader(
             extra_valid_ds,
             batch_size=cfg.valid_bs,
@@ -405,14 +407,14 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
 
-    for step, (images, heatmaps, n_points) in pbar:
+    for step, (images, heatmaps, n_points, source) in pbar:
         images = images.to(device).float()
         heatmaps = heatmaps.to(device).float()
         bs = len(images)
 
         with autocast(enabled=cfg.use_amp):
             pred = model(images)
-            loss = loss_fn(pred, heatmaps)
+            loss = loss_fn(pred, heatmaps, source)
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
@@ -551,6 +553,9 @@ def main():
         # loss
         if cfg.loss_fn == 'CenterLoss':
             loss_fn = CenterLoss()
+        elif cfg.loss_fn == 'CenterSourceWeightLoss':
+            loss_fn = CenterSourceWeightLoss(
+                weight_extracted=cfg.weight_extracted)
         else:
             NotImplementedError
 
