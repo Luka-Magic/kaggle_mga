@@ -10,8 +10,8 @@ class PSPNet(nn.Module):
 
         # パラメータ設定
         block_config = [3, 4, 6, 3]  # resnet50
-        h, w = img_size
-        img_size_8 = h // 8, w // 8  # img_sizeの1/8に
+        img_h, img_w = img_size
+        img_8_h, img_8_w = img_h // 8, img_w // 8  # img_sizeの1/8に
 
         # 4つのモジュールを構成するサブネットワークの用意
         self.feature_conv = FeatureMap_convolution()
@@ -25,13 +25,13 @@ class PSPNet(nn.Module):
             n_blocks=block_config[3], in_channels=1024, mid_channels=512, out_channels=2048, stride=1, dilation=4)
 
         self.pyramid_pooling = PyramidPooling(in_channels=2048, pool_sizes=[
-            6, 3, 2, 1], height=img_size_8, width=img_size_8)
+            6, 3, 2, 1], height=img_8_h, width=img_8_w)
 
         self.decode_feature = DecodePSPFeature(
-            height=img_size, width=img_size, n_classes=n_classes)
+            height=img_h, width=img_w, n_classes=n_classes)
 
         self.aux = AuxiliaryPSPlayers(
-            in_channels=1024, height=img_size, width=img_size, n_classes=n_classes)
+            in_channels=1024, height=img_h, width=img_w, n_classes=n_classes)
 
     def forward(self, x):
         x = self.feature_conv(x)

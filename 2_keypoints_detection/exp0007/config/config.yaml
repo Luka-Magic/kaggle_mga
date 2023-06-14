@@ -58,8 +58,8 @@ img_w: 768
 
 ##### Heatmap ###########################################
 sigma: 1
-heatmap_h: 128
-heatmap_w: 192
+heatmap_h: 512
+heatmap_w: 768
 blur_kernel: 11
 
 ##### DataLoader ########################################
