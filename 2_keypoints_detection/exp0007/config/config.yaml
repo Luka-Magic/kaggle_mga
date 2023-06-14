@@ -36,7 +36,7 @@ gamma: 0. # FOCALLoss
 
 ##### Optimizer ########################################
 optimizer: AdamW
-lr: 1e-2
+lr: 1e-3
 weight_decay: 1e-6
 
 ##### Scheduler ########################################
@@ -57,7 +57,7 @@ img_h: 384
 img_w: 512
 
 ##### Heatmap ###########################################
-sigma: 2
+sigma: 3
 heatmap_h: 384
 heatmap_w: 512
 
