@@ -24,7 +24,7 @@ chart_type2label:
   horizontal_bar: 4
 
 ######   Model   #######################################
-model_arch: hourglassnet
+model_arch: pspnet
 pretrained: false
 input_size: 3
 output_size: 1
