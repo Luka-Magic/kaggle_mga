@@ -436,7 +436,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         if scheduler_step_time == 'step':
             scheduler.step()
         pbar.set_description(f'[Train epoch {epoch}/{cfg.n_epochs}]')
-        # pbar.set_postfix(OrderedDict(loss=losses.avg, acc=accuracy.avg))
+        pbar.set_postfix(OrderedDict(loss=losses.avg))
         if cfg.use_wandb:
             wandb.log({
                 'step': (epoch - 1) * len(pbar) + step,
