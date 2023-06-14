@@ -614,7 +614,7 @@ def main():
                 for thr in thresholds:
                     print(
                         f'    Valid Accuracy thr:{thr} => {extra_valid_acc_per_thr[thr].avg*100:.1f}%')
-                valid_accuracy_dict[dataset_name] = extra_valid_acc_per_thr[thr]
+                valid_accuracy_dict[dataset_name] = extra_valid_acc_per_thr[thr].avg
 
             valid_accuracy = np.mean(list(valid_accuracy_dict.values()))
             wandb_dict['valid_accuracy'] = valid_accuracy
