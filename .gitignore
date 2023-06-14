@@ -2,5 +2,3 @@
 *.pth
 __pycache__
 outputs
-*.ipynb
-wandb
