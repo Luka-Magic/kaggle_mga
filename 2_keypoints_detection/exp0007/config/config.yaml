@@ -63,8 +63,8 @@ heatmap_w: 512
 blur_kernel: 11
 
 ##### DataLoader ########################################
-train_bs: 8
-valid_bs: 8
+train_bs: 12
+valid_bs: 12
 num_workers: 2
 
 ##### Data Augmentation #################################
