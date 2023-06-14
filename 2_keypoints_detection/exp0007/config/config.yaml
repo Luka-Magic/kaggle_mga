@@ -57,7 +57,7 @@ img_h: 384
 img_w: 512
 
 ##### Heatmap ###########################################
-sigma: 3
+sigma: 4
 heatmap_h: 384
 heatmap_w: 512
 
