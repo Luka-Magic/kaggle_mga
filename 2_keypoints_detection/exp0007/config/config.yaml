@@ -1,5 +1,5 @@
 #####   BASIC   ########################################
-debug: true
+debug: false
 use_wandb: false
 wandb_project: kaggle_mga_keypoints_detection
 dataset_name: data0004

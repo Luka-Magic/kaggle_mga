@@ -413,11 +413,8 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         heatmaps = heatmaps.to(device).float()
         source = source.to(device).long()
         bs = len(images)
-        print('img: ', images.shape)
-        print('heatmap: ', heatmaps.shape)
         with autocast(enabled=cfg.use_amp):
             pred = model(images)
-            print('pred: ', pred.shape)
             loss = loss_fn(pred, heatmaps, source)
 
         scaler.scale(loss).backward()
