@@ -591,6 +591,7 @@ def main():
             wandb_dict = {
                 'epoch': epoch,
             }
+            valid_accuracy_dict = {}
             train_loss, lr = train_one_epoch(
                 cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, point_counter)
             valid_acc_per_thr = valid_one_epoch(
@@ -606,7 +607,7 @@ def main():
             for thr in thresholds:
                 print(
                     f'    Valid Accuracy thr:{thr} => {valid_acc_per_thr[thr].avg*100:.1f}%')
-            valid_accuracy = valid_acc_per_thr[wandb_thr].avg
+            valid_accuracy_dict['valid'] = valid_acc_per_thr[wandb_thr].avg
             for dataset_name, extra_valid in extra_valid_dict.items():
                 extra_valid_acc_per_thr = valid_one_epoch(
                     cfg, epoch, extra_valid['valid_loader'], model, loss_fn, device, point_counter)
@@ -614,7 +615,9 @@ def main():
                 for thr in thresholds:
                     print(
                         f'    Valid Accuracy thr:{thr} => {extra_valid_acc_per_thr[thr].avg*100:.1f}%')
+                valid_accuracy_dict[dataset_name] = extra_valid_acc_per_thr[thr]
 
+            valid_accuracy = np.mean(list(valid_accuracy_dict.values()))
             wandb_dict['valid_accuracy'] = valid_accuracy
 
             # save model
