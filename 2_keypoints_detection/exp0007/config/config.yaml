@@ -57,10 +57,9 @@ img_h: 384
 img_w: 512
 
 ##### Heatmap ###########################################
-sigma: 1
+sigma: 2
 heatmap_h: 384
 heatmap_w: 512
-blur_kernel: 11
 
 ##### DataLoader ########################################
 train_bs: 12
