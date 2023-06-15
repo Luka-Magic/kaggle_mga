@@ -30,8 +30,8 @@ class PSPNet(nn.Module):
         self.decode_feature = DecodePSPFeature(
             height=img_h, width=img_w, n_classes=n_classes)
 
-        self.aux = AuxiliaryPSPlayers(
-            in_channels=1024, height=img_h, width=img_w, n_classes=n_classes)
+        # self.aux = AuxiliaryPSPlayers(
+        #     in_channels=1024, height=img_h, width=img_w, n_classes=n_classes)
 
     def forward(self, x):
         x = self.feature_conv(x)
