@@ -3,7 +3,7 @@ debug: false
 use_wandb: false
 wandb_project: kaggle_mga_image2text
 dataset_name: data0004
-extra_train_datasets: [data0005]
+extra_train_datasets: []
 extra_valid_datasets: [data0006, data0007]
 chart_types: [scatter, line, dot, vertical_bar, horizontal_bar]
 seed: 79
