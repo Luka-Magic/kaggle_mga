@@ -115,6 +115,8 @@ def score_series(
 
     y_true = notna_y_true.copy()
     y_pred = notna_y_pred.copy()
+    if len(y_true) == 0:
+        return 1.0
     if isinstance(y_true[0], str):
         return normalized_levenshtein_score(y_true, y_pred)
     else:
