@@ -363,13 +363,11 @@ def get_transforms(cfg, phase):
 
             A.Resize(height=cfg.img_h, width=cfg.img_w),
             A.Normalize(cfg.img_mean, cfg.img_std),
-            ToTensorV2()
         ]
     elif phase == 'valid':
         augs = [
             A.Resize(height=cfg.img_h, width=cfg.img_w),
             A.Normalize(cfg.img_mean, cfg.img_std),
-            ToTensorV2()
         ]
     if phase == 'train':
         return A.Compose(augs, keypoint_params=KeypointParams(format='xy'))
