@@ -4,7 +4,7 @@ use_wandb: true
 wandb_project: kaggle_mga_keypoints_detection
 dataset_name: data0004
 extra_train_datasets: [data0008]
-extra_valid_datasets: [data0006, data0007]
+extra_valid_datasets: [data0006]
 chart_types: [scatter]
 seed: 77
 n_epochs: 20
