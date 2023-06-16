@@ -555,7 +555,7 @@ def train_valid_one_epoch(
             f'[TRAIN epoch {epoch}/{cfg.n_epochs} ({valid_count_per_epoch}/{cfg.n_valid_per_epoch})]')
         pbar.set_postfix(OrderedDict(loss=train_losses.avg))
 
-        if step % 1000 == 0:
+        if step % 100 == 0:
             torch.cuda.empty_cache()
 
         if step % (len(train_loader) // cfg.n_valid_per_epoch) == 0:
