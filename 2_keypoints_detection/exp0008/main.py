@@ -43,7 +43,6 @@ from albumentations.pytorch import ToTensorV2
 
 from utils import seed_everything, AverageMeter, calc_accuracy, is_nan, tensor2arr, PointCounter
 from pose_resnet import get_pose_net
-from pspnet import PSPNet
 from loss import CenterLoss, CenterSourceWeightLoss
 
 
@@ -413,10 +412,10 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         heatmaps = heatmaps.to(device).float()
         source = source.to(device).long()
         bs = len(images)
+
         with autocast(enabled=cfg.use_amp):
             pred = model(images)
-            loss = loss_fn(pred[0], heatmaps, source) + \
-                cfg.aux_weight * loss_fn(pred[1], heatmaps, source)
+            loss = loss_fn(pred, heatmaps, source)
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
@@ -437,7 +436,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         if scheduler_step_time == 'step':
             scheduler.step()
         pbar.set_description(f'[Train epoch {epoch}/{cfg.n_epochs}]')
-        pbar.set_postfix(OrderedDict(loss=losses.avg))
+        # pbar.set_postfix(OrderedDict(loss=losses.avg, acc=accuracy.avg))
         if cfg.use_wandb:
             wandb.log({
                 'step': (epoch - 1) * len(pbar) + step,
@@ -466,7 +465,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, point_counte
         bs = len(images)
 
         with torch.no_grad():
-            pred = model(images)[0]
+            pred = model(images)
 
         gt_n_points = n_points.numpy()
 
@@ -544,8 +543,6 @@ def main():
         # model
         if cfg.model_arch == 'hourglassnet':
             model = get_pose_net(cfg.output_size).to(device)
-        elif cfg.model_arch == 'pspnet':
-            model = PSPNet((cfg.img_h, cfg.img_w)).to(device)
         else:
             NotImplementedError
         print(summary(model, (cfg.input_size, cfg.img_h, cfg.img_w)))
@@ -591,7 +588,6 @@ def main():
             wandb_dict = {
                 'epoch': epoch,
             }
-            valid_accuracy_dict = {}
             train_loss, lr = train_one_epoch(
                 cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, cfg.scheduler_step_time, scaler, point_counter)
             valid_acc_per_thr = valid_one_epoch(
@@ -607,7 +603,7 @@ def main():
             for thr in thresholds:
                 print(
                     f'    Valid Accuracy thr:{thr} => {valid_acc_per_thr[thr].avg*100:.1f}%')
-            valid_accuracy_dict['valid'] = valid_acc_per_thr[wandb_thr].avg
+            valid_accuracy = valid_acc_per_thr[wandb_thr].avg
             for dataset_name, extra_valid in extra_valid_dict.items():
                 extra_valid_acc_per_thr = valid_one_epoch(
                     cfg, epoch, extra_valid['valid_loader'], model, loss_fn, device, point_counter)
@@ -615,9 +611,7 @@ def main():
                 for thr in thresholds:
                     print(
                         f'    Valid Accuracy thr:{thr} => {extra_valid_acc_per_thr[thr].avg*100:.1f}%')
-                valid_accuracy_dict[dataset_name] = extra_valid_acc_per_thr[thr].avg
 
-            valid_accuracy = np.mean(list(valid_accuracy_dict.values()))
             wandb_dict['valid_accuracy'] = valid_accuracy
 
             # save model

@@ -30,8 +30,8 @@ class PSPNet(nn.Module):
         self.decode_feature = DecodePSPFeature(
             height=img_h, width=img_w, n_classes=n_classes)
 
-        # self.aux = AuxiliaryPSPlayers(
-        #     in_channels=1024, height=img_h, width=img_w, n_classes=n_classes)
+        self.aux = AuxiliaryPSPlayers(
+            in_channels=1024, height=img_h, width=img_w, n_classes=n_classes)
 
     def forward(self, x):
         x = self.feature_conv(x)
@@ -39,14 +39,14 @@ class PSPNet(nn.Module):
         x = self.feature_res_2(x)
         x = self.feature_dilated_res_1(x)
 
-        # output_aux = self.aux(x)  # Featureモジュールの途中をAuxモジュールへ
+        output_aux = self.aux(x)  # Featureモジュールの途中をAuxモジュールへ
 
         x = self.feature_dilated_res_2(x)
 
         x = self.pyramid_pooling(x)
         output = self.decode_feature(x)
 
-        return output
+        return output, output_aux
 
 
 class conv2DBatchNormRelu(nn.Module):
