@@ -37,7 +37,7 @@ from torchvision.transforms import Compose
 from torch.cuda.amp import autocast, GradScaler
 
 # other
-import albumentations
+import albumentations as A
 from albumentations import KeypointParams
 from albumentations.pytorch import ToTensorV2
 
@@ -332,19 +332,49 @@ class MgaLmdbDataset(Dataset):
 
 def get_transforms(cfg, phase):
     if phase == 'train':
-        aug = cfg.train_aug
-    elif phase == 'valid':
-        aug = cfg.valid_aug
-    elif phase == 'tta':
-        aug = cfg.tta_aug
+        augs = [
+            # 色彩変換
+            A.OneOf([
+                A.ChannelShuffle(p=1.),  # RGBの並び替え,
+                A.RandomGamma((30, 180), p=1.),
+                A.RandomBrightnessContrast(
+                    brightness_limit=(-0.05, 0.2),
+                    contrast_limit=(-0.05, 0.2),
+                    p=1.),
+            ], p=0.5),
 
-    augs = [getattr(albumentations, name)(**kwargs)
-            for name, kwargs in aug.items()]
-    # augs.append(ToTensorV2(p=1.))
+            # gray scale
+            A.ToGray(p=0.2),
+
+            # 低画質化
+            A.OneOf([
+                A.GaussianBlur(
+                    blur_limit=(3, 5),
+                    sigma_limit=0.7,
+                    p=1.),
+                A.GaussianBlur(
+                    blur_limit=(3, 5),
+                    sigma_limit=0.7,
+                    p=1.),
+                A.GaussNoise(mean=30, p=1.),
+                A.JpegCompression(quality_lower=50, quality_upper=100, p=1.),
+                A.Downscale(scale_min=0.75, scale_max=0.99, p=1.),
+            ], p=0.5),
+
+            A.Resize(height=cfg.img_h, width=cfg.img_w),
+            A.Normalize(cfg.img_mean, cfg.img_std),
+            ToTensorV2()
+        ]
+    elif phase == 'valid':
+        augs = [
+            A.Resize(height=cfg.img_h, width=cfg.img_w),
+            A.Normalize(cfg.img_mean, cfg.img_std),
+            ToTensorV2()
+        ]
     if phase == 'train':
-        return albumentations.Compose(augs, keypoint_params=KeypointParams(format='xy'))
+        return A.Compose(augs, keypoint_params=KeypointParams(format='xy'))
     else:
-        return albumentations.Compose(augs)
+        return A.Compose(augs)
 
 
 def prepare_dataloader(cfg, lmdb_dir, train_indices, valid_indices, extra_train_info, extra_valid_info):
