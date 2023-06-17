@@ -4,7 +4,7 @@ use_wandb: false
 wandb_project: kaggle_mga_image2text
 dataset_name: data0004
 extra_train_datasets: []
-extra_valid_datasets: [data0006, data0007]
+extra_valid_datasets: []
 chart_types: [scatter, line, dot, vertical_bar, horizontal_bar]
 seed: 78
 n_epochs: 10
@@ -16,9 +16,9 @@ use_amp: true
 n_valid_per_epoch: 3
 
 #####   Model   ######################################
-restart: false
+restart: true
 pretrained_model_from_net_path: google/matcha-base
-pretrained_model_exp_name: exp0016
+pretrained_model_exp_name: exp0027
 max_new_tokens: 512
 
 #####   Loss   #######################################
