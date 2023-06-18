@@ -60,8 +60,6 @@ SEPARATOR_TOKENS = [
 
 new_tokens = SEPARATOR_TOKENS
 
-CHART_TYPES = ['scatter', 'line', 'dot', 'vertical_bar', 'horizontal_bar']
-
 CHART_TYPE2LABEL = {
     'line': 0,
     'vertical_bar': 1,
@@ -80,7 +78,7 @@ n_images = 0
 # Data split
 
 
-def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
+def split_data(cfg, lmdb_dir, split_label) -> Dict[int, Dict[str, Any]]:
     """
     データからextractedだけを抜き取りkfoldでsplitさせる
     その後trainデータにgeneratedのデータを全て合わせる
@@ -116,13 +114,12 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
             label = txn.get(label_key).decode('utf-8')
         json_dict = json.loads(label)
 
-        assert json_dict['chart-type'] in CHART_TYPES
         if json_dict['chart-type'] not in cfg.chart_types:
             continue
 
         label_source = json_dict['source']
 
-        if label_source == 'extracted':
+        if label_source in ['extracted', 'icdar2022']:
             extracted_indices.append(idx)
             extracted_info['chart_type'].append(json_dict['chart-type'])
             xs, ys = [], []
@@ -169,7 +166,7 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
     return indices_dict
 
 
-def split_extra_data(cfg, extra_train_dirs, extra_valid_dirs):
+def split_extra_data(cfg, fold, extra_train_dirs, extra_valid_dirs, extra_split_dirs):
     """
     Returns:
         extra_train_info (Dict[int, Dict[str, List[int]]]): A dictionary containing train indices of each fold.
@@ -178,8 +175,14 @@ def split_extra_data(cfg, extra_train_dirs, extra_valid_dirs):
             Example: {dataset_name: {'lmdb_dir': Path, 'valid': [5, 7, ....], 'gt_df': a dataFrame}, ...}
     """
 
-    extra_train_info = {}  # key: dataset, value: {'train': []}
-    extra_valid_info = {}  # key: dataset, value: {'valid': [], 'gt_df': pd.DataFrame}
+    extra_train_info = {}  # key: dataset_name, value: {'train': []}
+    extra_valid_info = {}  # key: dataset_name, value: {'valid': [], 'gt_df': pd.DataFrame}
+    # key: dataset_name, value: {fold: {'train': [], 'valid': [], 'gt_df': pd.DataFrame}}
+    extra_split_info = {}
+
+    for extra_split_dir in extra_split_dirs:
+        dataset_name = extra_train_dir.stem
+        extra_split_info[dataset_name] = split_data(cfg, extra_split_dir)
 
     # train
     for extra_train_dir in extra_train_dirs:
@@ -259,7 +262,7 @@ def split_extra_data(cfg, extra_train_dirs, extra_valid_dirs):
                 "chart_type": valid_info['chart_type'] * 2,
             })
         extra_valid_info[dataset_name]['gt_df'] = gt_df
-    return extra_train_info, extra_valid_info
+    return extra_train_info, extra_valid_info, extra_split_info
 
 
 class MgaDataset(Dataset):
@@ -408,7 +411,7 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
 # Dataloader
 
 
-def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices, extra_train_info, extra_valid_info):
+def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices, extra_train_info, extra_valid_info, extra_split_info):
     # train
     # dataset
     train_ds_list = []
@@ -420,6 +423,8 @@ def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices, e
         extra_train_indices = dataset_info['train']
         train_ds_list.append(MgaDataset(cfg, extra_lmdb_dir, extra_train_indices,
                                         processor, 'train'))
+    for dataset_info in extra_split_info['train'].values():
+
     concat_train_ds = ConcatDataset(train_ds_list)
     # dataloader
     train_loader = DataLoader(
@@ -692,7 +697,7 @@ def main():
 
     device = torch.device('cuda') if torch.cuda.is_available() else 'cpu'
     indices_per_fold = split_data(cfg, LMDB_DIR)
-    extra_train_info, extra_valid_info = split_extra_data(
+    extra_train_info, extra_valid_info, extra_split_info = split_extra_data(
         cfg, EXTRA_TRAIN_DIRS, EXTRA_VALID_DIRS)
 
     for fold in cfg.use_fold:
@@ -742,8 +747,8 @@ def main():
 
         # data
         train_indices, valid_indices = indices_per_fold[fold]['train'], indices_per_fold[fold]['valid']
-        train_loader, valid_loader, extra_valid_dict = prepare_dataloader(
-            cfg, LMDB_DIR, processor, train_indices, valid_indices, extra_train_info, extra_valid_info)
+        train_loader, valid_loader, extra_split_info[fold] = prepare_dataloader(
+            cfg, LMDB_DIR, processor, train_indices, valid_indices, extra_train_info, extra_valid_info, extra_split_info)
 
         # loss_fn
         loss_fn = CrossEntropyWithWeightLoss(

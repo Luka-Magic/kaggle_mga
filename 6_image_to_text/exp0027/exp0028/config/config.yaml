@@ -1,0 +1,56 @@
+#####   BASIC   ######################################
+debug: false
+use_wandb: false
+wandb_project: kaggle_mga_image2text
+dataset_name: data0004
+extra_train_datasets: []
+extra_valid_datasets: []
+chart_types: [scatter, line, dot, vertical_bar, horizontal_bar]
+seed: 79
+n_epochs: 10
+split_method: StratifiedKFold
+n_folds: 5
+use_fold: [2] # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+save_model: true
+use_amp: true
+n_valid_per_epoch: 3
+
+#####   Model   ######################################
+restart: true
+pretrained_model_from_net_path: google/matcha-base
+pretrained_model_exp_name: exp0028
+max_new_tokens: 512
+
+#####   Loss   #######################################
+weight_extracted: 10.
+
+##### Optimizer ######################################
+optimizer: AdamW
+lr: 3e-5
+weight_decay: 0
+
+##### Scheduler ######################################
+scheduler: # OneCycleLR, huggingface_scheduler
+scheduler_step_time: step
+T_0: ${n_epochs} # CAWR
+T_mult: 1 # CAWR
+eta_min: 1e-9 # CAWR
+
+pct_start: 0.1 # OCLR
+div_factor: 100. # OCLR
+final_div_factor: 1000. # OCLR
+
+warmup_step: 1000 # HS
+
+##### Image Info #####################################
+img_h: 560
+img_w: 560
+
+##### Text Info ######################################
+max_length: 1024
+max_patches: 1024
+
+##### DataLoader #####################################
+train_bs: 2
+valid_bs: 2
+num_workers: 2

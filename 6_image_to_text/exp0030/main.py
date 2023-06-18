@@ -60,8 +60,6 @@ SEPARATOR_TOKENS = [
 
 new_tokens = SEPARATOR_TOKENS
 
-CHART_TYPES = ['scatter', 'line', 'dot', 'vertical_bar', 'horizontal_bar']
-
 CHART_TYPE2LABEL = {
     'line': 0,
     'vertical_bar': 1,
@@ -116,7 +114,6 @@ def split_data(cfg, lmdb_dir) -> Dict[int, Dict[str, Any]]:
             label = txn.get(label_key).decode('utf-8')
         json_dict = json.loads(label)
 
-        assert json_dict['chart-type'] in CHART_TYPES
         if json_dict['chart-type'] not in cfg.chart_types:
             continue
 
