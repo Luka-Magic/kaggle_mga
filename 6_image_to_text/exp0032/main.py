@@ -299,10 +299,11 @@ class MgaDataset(Dataset):
             all_y.append(y)
 
         if self.phase == 'train':
-            if not isinstance(all_x[0], str):
-                all_x = reduce_precision(all_x)
-            if not isinstance(all_y[0], str):
-                all_y = reduce_precision(all_y)
+            if len(all_x) != 0 and len(all_y) != 0:
+                if not isinstance(all_x[0], str):
+                    all_x = reduce_precision(all_x)
+                if not isinstance(all_y[0], str):
+                    all_y = reduce_precision(all_y)
 
         # chart_type = f"<{json_dict['chart-type']}>"
         data_str = \
