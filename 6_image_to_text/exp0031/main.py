@@ -518,7 +518,6 @@ def train_valid_one_epoch(
 
     # train & valid
     for step, batch in pbar:
-        step += 1
         flattened_patches = batch['flattened_patches'].to(device)
         attention_mask = batch['attention_mask'].to(device)
         labels = batch["labels"].to(device)
@@ -549,6 +548,9 @@ def train_valid_one_epoch(
         pbar.set_description(
             f'[TRAIN epoch {epoch}/{cfg.n_epochs} ({valid_count_per_epoch}/{cfg.n_valid_per_epoch})]')
         pbar.set_postfix(OrderedDict(loss=train_losses.avg))
+
+        if step % 100 == 0:
+            torch.cuda.empty_cache()
 
         if step % (len(train_loader) // cfg.n_valid_per_epoch) == 0:
             # valid
@@ -763,7 +765,8 @@ def main():
                 best_score_dict = json.load(f)
                 start_epoch = best_score_dict[str(fold)]['epoch'] + 1
                 n_images = best_score_dict[str(fold)]['n_images']
-                best_score = best_score_dict[str(fold)]['best_score']
+                # best_score = best_score_dict[str(fold)]['best_score']
+                best_score = 0.0
         else:
             n_images = 0
             start_epoch = 1
