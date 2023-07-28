@@ -403,8 +403,6 @@ def collate_fn(samples: List[Dict[str, Union[torch.Tensor, List[int], str]]]) ->
     return batch
 
 # Dataloader
-
-
 def prepare_dataloader(cfg, lmdb_dir, processor, train_indices, valid_indices, extra_train_info, extra_valid_info):
     # train
     # dataset
